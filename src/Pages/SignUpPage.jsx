@@ -10,7 +10,7 @@ function SignUpPage() {
   return (
     <div className="min-h-screen">
       {/* SignUp Form */}
-      <div className="hidden lg:flex lg:flex-col lg:w-full lg:h-full items-center lg:p-10  justify-center gap-10 bg-[url('/assets/LoginPage/bgimg1.png')] bg-cover bg-[#090D00]  ">   
+      <div className=" flex flex-col lg:w-full h-full lg:h-full items-center lg:p-8  justify-center gap-10 bg-[url('/assets/LoginPage/bgimg1.png')] bg-cover bg-[#090D00]  ">   
           <div className="flex items-center justify-center gap-2 mt-10">
             <img className="w-[72px] h-[72px]" src="/assets/logo.png" />
             <div className="text-white font-SfProDisplay font-[400] text-3xl ">
@@ -80,7 +80,7 @@ function SignUpPage() {
             <p className="mt-1">
             Already have an account? 
               <Link to={"/"} className="font-[500] ml-2 hover:underline text-white">
-                Sign Up
+                Sign In
               </Link>
             </p>
           </div>

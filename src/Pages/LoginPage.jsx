@@ -10,7 +10,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen ">
+    <div className="flex lg:flex-row flex-col  min-h-screen ">
       {/* Left panel */}
       <div  className="w-full bg-[url('/assets/LoginPage/bgimg1.png')] bg-cover  lg:w-[45%] p-8 flex flex-col justify-center   bg-[#111111]  ">
         <div className="max-w-md flex flex-col  gap-[13rem]">
@@ -44,7 +44,7 @@ const LoginPage = () => {
       </div>
 
       {/* Right panel - Login form */}
-      <div className="hidden lg:flex lg:flex-col lg:w-[65%] items-center justify-center gap-10 bg-[url('/assets/LoginPage/bgimg1.png')] bg-cover bg-[#090D00]  ">
+      <div className="lg:flex lg:flex-col lg:w-[65%] items-center justify-center gap-10 bg-[url('/assets/LoginPage/bgimg1.png')] bg-cover bg-[#090D00]  ">
         <div className="flex items-center justify-center ">
           <div className="flex items-center justify-center gap-1">
             <img className="w-[72px] h-[72px]" src="/assets/logo.png" />
@@ -81,13 +81,14 @@ const LoginPage = () => {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-
+            
             <button
               type="submit"
               className="w-full bg-white text-[#1E3A5F] rounded-full py-4 font-[500] text-[18px]"
             >
               Sign in
             </button>
+        
 
             <div className="text-center mt-4">
               <a href="#" className="text-white hover:underline text-sm">
