@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { EyeOff, Eye } from "lucide-react";
+import { Link } from "react-router";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -52,7 +53,7 @@ const LoginPage = () => {
             </div>
           </div>
         </div>
-        <div className="w-full max-w-[440px] h-[474px] bg-[#1E3A5F] rounded-lg p-8 shadow-xl">
+        <div className="w-full max-w-[440px] h-[474px] bg-[#1E3A5F] rounded-2xl p-8 shadow-xl">
           <h2 className="text-[40px] font-bold font-outfit text-white mb-8 text-center">
             Sign In
           </h2>
@@ -83,7 +84,7 @@ const LoginPage = () => {
 
             <button
               type="submit"
-              className="w-full bg-white text-[#1E3A5F] rounded-full py-4 font-[500] text-[16px]"
+              className="w-full bg-white text-[#1E3A5F] rounded-full py-4 font-[500] text-[18px]"
             >
               Sign in
             </button>
@@ -99,9 +100,9 @@ const LoginPage = () => {
             <p>Sign in using your email and password.</p>
             <p className="mt-1">
               Don't have an account?{" "}
-              <a href="#" className="font-[500] hover:underline text-white">
-                Sign up
-              </a>
+                <Link to="/signup" className="font-[500] hover:underline text-white">
+                    Sign up
+                </Link>
             </p>
           </div>
         </div>
