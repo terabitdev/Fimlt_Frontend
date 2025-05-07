@@ -1,15 +1,13 @@
 
 
 import { useState } from 'react';
+import SideBar from '../Components/SideBar';
+import TopBar from '../Components/TopBar';
 import { 
   MoreHorizontal, 
-  Home, 
   Users, 
   FileText, 
-  LogOut, 
   Info,
-  Search,
-  Bell,
   Plus,
   ChevronDown
 } from 'lucide-react';
@@ -24,34 +22,13 @@ export default function FimitDashboard() {
     { month: 'Mar', value: 60 },
     { month: 'Apr', value: 75 },
     { month: 'May', value: 55 },
-    { month: 'Jun', value: 64 }
+    { month: 'Jun', value: 62 }
   ];
   
-  // Generate SVG path for the chart line
+  // Generate SVG path for the chart line - smoother curve that matches image exactly
   const generatePath = () => {
-    // Map data to coordinates
-    const points = chartData.map((point, index) => {
-      const x = (index / (chartData.length - 1)) * 100;
-      // Invert the y scale (100 - value) since SVG coordinates increase downward
-      const y = 100 - point.value;
-      return { x, y };
-    });
-    
-    let path = `M${points[0].x},${points[0].y}`;
-    
-    // Create curved path using cubic bezier
-    for (let i = 0; i < points.length - 1; i++) {
-      const x1 = points[i].x + (points[i + 1].x - points[i].x) / 3;
-      const y1 = points[i].y;
-      const x2 = points[i].x + 2 * (points[i + 1].x - points[i].x) / 3;
-      const y2 = points[i + 1].y;
-      const x = points[i + 1].x;
-      const y = points[i + 1].y;
-      
-      path += ` C${x1},${y1} ${x2},${y2} ${x},${y}`;
-    }
-    
-    return path;
+    // Custom path that matches the image exactly
+    return "M0,38 C16.6667,50 33.3333,62 50,48 C66.6667,34 83.3333,20 100,38";
   };
   
   // Generate area path (path + bottom closure)
@@ -63,75 +40,17 @@ export default function FimitDashboard() {
   return (
     <div className="flex min-h-screen h-full bg-black text-white">
       {/* Sidebar */}
-      <div className="w-64 bg-[#111111] rounded-[10px] p-4 m-4 flex flex-col">
-        <div className="flex items-center mb-8">
-          <div className="bg-blue-800 rounded p-2 mr-3">
-            <div className="text-white font-bold text-xl">F</div>
-          </div>
-          <div className="text-white font-bold text-3xl">FIMIT</div>
-        </div>
-        
-        <div className="text-gray-400 mb-4">Main Menu</div>
-        
-        <div className="bg-blue-900 text-white p-3 rounded flex items-center mb-2">
-          <Home className="mr-3" />
-          <span>Home</span>
-        </div>
-        
-        <div className="text-white p-3 rounded flex items-center mb-2 hover:bg-gray-800">
-          <Users className="mr-3" />
-          <span>Users Management</span>
-        </div>
-        
-        <div className="text-white p-3 rounded flex items-center mb-2 hover:bg-gray-800">
-          <FileText className="mr-3" />
-          <span>Floors Plan</span>
-        </div>
-        
-        <div className="mt-auto text-white p-3 rounded flex items-center hover:bg-gray-800">
-          <LogOut className="mr-3" />
-          <span>Logout</span>
-        </div>
-      </div>
+       <SideBar />
       
       {/* Main Content */}
       <div className="flex-1 p-6">
         {/* Top Bar */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex-1 max-w-lg">
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Search here" 
-                className="w-full py-2 px-4 rounded-md bg-gray-800 text-white"
-              />
-              <div className="absolute right-3 top-2 flex">
-                <div className="border-r border-gray-600 pr-2 mr-2">
-                  <Search size={20} className="text-gray-400" />
-                </div>
-                <div className="text-gray-400 font-semibold">F</div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center">
-            <button className="p-2 bg-gray-800 rounded-md mr-4">
-              <Bell size={20} />
-            </button>
-            <div className="flex items-center">
-              <div className="h-10 w-10 bg-gray-600 rounded-md mr-3"></div>
-              <div>
-                <div className="text-white font-semibold">Zaid Alrumi</div>
-                <div className="text-gray-400 text-sm">Zaidrumione@gmail.com</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
+        <TopBar />
+      
         {/* Welcome */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-semibold">Welcome, Zaid!</h1>
-          <button className="bg-blue-800 hover:bg-blue-700 text-white py-2 px-4 rounded-md flex items-center">
+        <div className="flex justify-between font-DMSansRegular items-center mb-6">
+          <h1 className="text-3xl font-[500]">Welcome, Zaid!</h1>
+          <button className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md flex items-center">
             <Plus size={20} className="mr-2" />
             Add Category
           </button>
@@ -139,58 +58,59 @@ export default function FimitDashboard() {
         
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-6 mb-6">
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <div className="flex justify-between mb-6">
+          <div className="bg-white flex flex-col gap-8 font-poppins p-4 rounded-lg">
+            <div className="flex justify-between">
               <div className="flex items-center">
-                <div className="bg-blue-900 p-2 rounded-md mr-3">
+                <div className="bg-[#1E3A5F] p-2 rounded-md mr-3">
                   <Users size={20} />
                 </div>
-                <span>Total Users</span>
+                <span className='text-black'>Total Users</span>
               </div>
-              <Info size={20} className="text-gray-400" />
+              <Info size={20} className="text-black" />
             </div>
-            <div className="text-4xl font-bold">4,150</div>
+            <div className="text-[32px] text-black font-[500]">4,150</div>
           </div>
           
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <div className="flex justify-between mb-6">
+          <div className="bg-white flex flex-col gap-8 font-poppins p-4 rounded-lg">
+            <div className="flex justify-between ">
               <div className="flex items-center">
-                <div className="bg-blue-900 p-2 rounded-md mr-3">
-                  <FileText size={20} />
+                <div className="bg-[#1E3A5F] p-2 rounded-md mr-3">
+                  <img src="/assets/scanned.svg" alt="" />
                 </div>
-                <span>Total Floors Scanned</span>
+                <span className='text-black'>Total Floors Scanned</span>
               </div>
-              <Info size={20} className="text-gray-400" />
+              <Info size={20} className="text-black" />
             </div>
-            <div className="text-4xl font-bold">2,120</div>
+            <div className="text-[32px] text-black font-[500]">2,120</div>
           </div>
           
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <div className="flex justify-between mb-6">
+          <div className="bg-white flex flex-col gap-8 font-poppins p-4 rounded-lg">
+            <div className="flex justify-between">
               <div className="flex items-center">
-                <div className="bg-blue-900 p-2 rounded-md mr-3">
+                <div className="bg-[#1E3A5F] p-2 rounded-md mr-3">
                   <FileText size={20} />
                 </div>
-                <span>Scans This Week</span>
+                <span className='text-black'>Scans This Week</span>
               </div>
-              <Info size={20} className="text-gray-400" />
+              <Info size={20} className="text-black" />
             </div>
-            <div className="text-4xl font-bold">3,189</div>
+            <div className="text-[32px] text-black font-[500]">3,189</div>
           </div>
         </div>
         
         {/* Graph Card */}
-        <div className="bg-white p-6 rounded-lg">
+        <div className="bg-white p-6 rounded-lg font-DMSansRegular">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl text-black font-semibold">New Users</h2>
-            <div className="flex items-center gap-2">
-              <button className="border border-gray-200 rounded-lg px-4 py-2 flex items-center gap-2 text-gray-700">
-                {selectedMonth}
-                <ChevronDown size={16} />
-              </button>
-              <button className="text-gray-500">
+            <h2 className="text-[24px] text-black font-[500]">New Users</h2>
+            <div className="flex flex-col items-end gap-2">
+            <button className="text-black">
                 <MoreHorizontal size={20} />
               </button>
+              <button className="border border-[#D9D9D9] rounded-lg px-4 py-2 flex items-center gap-2 text-black">
+                {selectedMonth}
+                <ChevronDown size={16} className='text-black' />
+              </button>
+              
             </div>
           </div>
           
@@ -207,7 +127,7 @@ export default function FimitDashboard() {
             </div>
             
             {/* Chart area */}
-            <div className="absolute left-12 right-0 top-0 bottom-6 overflow-hidden">
+            <div className="absolute   left-12 right-0 top-5 bottom-6 overflow-hidden">
               {/* Chart SVG */}
               <svg className="w-full h-full" preserveAspectRatio="none">
                 {/* Area under curve */}
@@ -221,7 +141,7 @@ export default function FimitDashboard() {
                 <path 
                   d={generatePath()}
                   stroke="#2c4b7c" 
-                  strokeWidth="2" 
+                  strokeWidth="3" 
                   fill="none" 
                 />
                 
@@ -235,9 +155,9 @@ export default function FimitDashboard() {
               </svg>
               
               {/* February data point indicator */}
-              <div className="absolute left-[20%] top-0 bottom-0 flex items-center justify-center pointer-events-none">
-                <div className="h-full w-1 bg-gradient-to-b from-blue-800 to-transparent opacity-70 rounded-full"></div>
-                <div className="absolute top-[52%] w-4 h-4 bg-blue-800 rounded-full border-2 border-white shadow-md transform -translate-x-1/2"></div>
+              <div className="absolute left-[20%] top-5 bottom-0 flex items-center justify-center pointer-events-none">
+                <div className="h-full w-6 bg-gradient-to-b  from-[#1E3A5F] to-transparent opacity-70 rounded-full"></div>
+                <div className="absolute left-[12px] top-2 w-4 h-4 bg-white rounded-full border-2 border-white shadow-md transform -translate-x-1/2"></div>
               </div>
             </div>
             
