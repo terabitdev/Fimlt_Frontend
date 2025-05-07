@@ -24,7 +24,7 @@ function SideBar() {
         <div className="text-white text-[16px] font-[400] font-DMSansRegular mb-4">Main Menu</div>
         
         <Link to="/dashboard">
-        <div className="text-white text-[16px] font-[500] font-DMSansRegular p-3 rounded flex items-center mb-2 hover:bg-gray-800">
+        <div className="text-white text-[16px] font-[500] font-DMSansRegular p-3 rounded flex items-center mb-2  hover:bg-gray-800">
           <Home className="mr-3" />
           <span>Home</span>
         </div>
@@ -36,11 +36,12 @@ function SideBar() {
           <span>Users Management</span>
         </div>
         </Link>
-        
+        <Link to={"/floors-plan"}>
         <div className="text-white text-[16px] font-[400] font-DMSansRegular p-3 rounded flex items-center mb-2 hover:bg-gray-800">
           <FileText className="mr-3" />
           <span>Floors Plan</span>
         </div>
+        </Link>
         
         <div className="mt-auto text-white text-[16px] font-[400] font-DMSansRegular p-3 rounded flex items-center hover:bg-gray-800">
           <LogOut className="mr-3" />

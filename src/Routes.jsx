@@ -7,6 +7,8 @@ import UsersManagement from "./Pages/UsersManagement";
 import UserDetails from "./Components/UserManagement/UserDetails";
 import ProjectDetails from "./Components/UserManagement/ProjectDetails";
 import EditDetails from "./Components/UserManagement/EditDetails";
+import FloorsPlan from "./Pages/FloorsPlan";
+import ProjectDetailsFloorsPlan from "./Components/FloorsPlan/ProjectDetails";
 
 const ProjectRoutes = () => {
     let element = useRoutes([
@@ -17,6 +19,8 @@ const ProjectRoutes = () => {
         { path : "/user-details", element: <UserDetails /> },
         { path : "/project-details", element: <ProjectDetails /> },
         { path : "/edit-details", element: <EditDetails /> },
+        { path : "/floors-plan", element: <FloorsPlan /> },
+        { path : "/project-details-floors-plan", element: <ProjectDetailsFloorsPlan /> },
         { path : "*", element: <LoginPage /> }, // Redirect to LoginPage for any other route
     ]);
     return element;
