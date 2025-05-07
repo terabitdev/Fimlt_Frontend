@@ -2,6 +2,8 @@ import { useState } from 'react';
 import SideBar from '../SideBar'
 import TopBar from '../TopBar'
 import {Plus} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import React from 'react';
 
 
  function FacilityDashboard() {
@@ -57,11 +59,12 @@ import {Plus} from 'lucide-react';
                   <p className="text-white text-xs">
                     {facility.description}
                   </p>
-                  <div className="  ">
+                    <Link to={`/project-details`}>
                     <button className="w-32 bg-white text-[#0D0D12] rounded-full px-2 py-2 text-xs font-medium">
                       View
                     </button>
-                  </div>
+                    </Link>
+         
                 </div>
               </div>
             </div>
