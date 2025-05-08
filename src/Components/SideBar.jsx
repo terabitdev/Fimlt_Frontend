@@ -24,7 +24,7 @@ function SideBar() {
   // Check if the screen is mobile size
   useEffect(() => {
     const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth < 1180);
     };
     
     // Initial check
