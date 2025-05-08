@@ -46,7 +46,7 @@ function RoomMeasurementInterface() {
             Date: <span className="font-[400]"> {userData.date}</span>
           </p>
         </div>
-        <div className="flex gap-2 font-Urbanist">
+        <div className="flex flex-col md:flex-row gap-2 font-Urbanist">
           <FilterByCategories />
           <button className="bg-[#1E3A5F] border border-white text-white px-3 py-1 rounded-lg text-sm">
             Edit
@@ -102,7 +102,7 @@ function ProjectDetails() {
           <TopBar />
           {/* Welcome */}
           <div className="flex justify-between font-DMSansRegular items-center mb-6">
-            <h1 className="text-3xl font-[500]">Users Details</h1>
+            <h1 className="text-3xl font-[500]">Floors Plan</h1>
             <button className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md flex items-center">
               <Plus size={20} className="mr-2" />
               Add Category

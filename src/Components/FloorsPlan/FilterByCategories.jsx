@@ -32,7 +32,7 @@ const FilterByCategories = ({ onFilterChange }) => {
   }, [selectedCategories, onFilterChange]);
 
   return (
-    <div className="relative w-full max-w-[202px]">
+    <div className="relative w-full max-w-[150px] md:max-w-[202px]">
       {/* Filter Button */}
       <button 
         onClick={toggleDropdown}
@@ -41,7 +41,7 @@ const FilterByCategories = ({ onFilterChange }) => {
         <div className="flex flex-col space-y-1">
             <img src='/assets/filter.svg' className="text-[#090D00]"  />
         </div>
-        <span className="text-[16px] font-medium font-DMSansRegular   text-[#090D00]">Filter By Categories</span>
+        <span className="text-sm md:text-[16px] font-medium font-DMSansRegular   text-[#090D00]">Filter By Categories</span>
       </button>
 
       {/* Categories Dropdown */}

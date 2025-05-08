@@ -16,14 +16,14 @@ function RoomMeasurementInterface() {
  
   
     return (
-      <div className="min-h-screen  bg-[#1E3A5F] rounded-xl">
+      <div className="min-h-screen max-w-[22rem] md:max-w-5xl  bg-[#1E3A5F] rounded-xl">
 
          {/* User Profile Section */}
          <div className="p-4  border-b border-white flex items-center justify-between ">
 
             <div className='flex flex-col font-monrope' >
-                <h1 className='font-[700] text-[31px]'>Main Office</h1>
-                <h3 className='font-[500] text-[20px]'>Finance Department Layout</h3>
+                <h1 className='font-[700] text-2xl md:text-[31px]'>Main Office</h1>
+                <h3 className='font-[500] text-sm md:text-[20px]'>Finance Department Layout</h3>
             </div>
         
           <div className="flex items-center justify-center gap-3 font-Urbanist h-12 ">
@@ -38,11 +38,11 @@ function RoomMeasurementInterface() {
           </div>
         </div>
 
-        <div className='flex flex-row justify-between gap-5 max-w-[61rem] mt-20 mx-auto'>
+        <div className='flex flex-col md:flex-row justify-between gap-5 max-w-[61rem] mt-10 md:mt-20 mx-auto'>
 
         
           {/* Room Preview Image */}
-          <div className="w-[405px] h-[270px] ">
+          <div className="md:w-[405px] md:h-[270px] max-w-sm ">
             <img
               src="/assets/img2.png"
               alt="Room Preview"
@@ -51,7 +51,7 @@ function RoomMeasurementInterface() {
           </div>
   
           {/* Room Details Table */}
-          <div className="p-4 w-[583px] h-[370px] rounded-3xl bg-white">
+          <div className="p-4 md:w-[583px] md:h-[370px] max-w-sm rounded-3xl bg-white">
             <table className=" w-full h-full font-SFProDisplay">
               <thead>
                 <tr>
@@ -86,7 +86,7 @@ function ProjectDetails() {
        <TopBar />
        {/* Welcome */}
        <div className="flex justify-between font-DMSansRegular items-center mb-6">
-         <h1 className="text-3xl font-[500]">Project Details</h1>
+         <h1 className="text-2xl md:text-3xl font-[500]">Project Details</h1>
          <button className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md flex items-center">
            <Plus size={20} className="mr-2" />
            Add Category

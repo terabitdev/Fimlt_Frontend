@@ -12,13 +12,13 @@ const LoginPage = () => {
   return (
     <div className="flex lg:flex-row flex-col  min-h-screen ">
       {/* Left panel */}
-      <div  className="w-full bg-[url('/assets/LoginPage/bgimg1.png')] bg-cover  lg:w-[45%] p-8 flex flex-col justify-center   bg-[#111111]  ">
+      <div  className="w-full bg-[url('/assets/LoginPage/bgimg1.png')] bg-cover  lg:w-[45%] py-4 md:py-8 md:p-8 flex flex-col justify-center   bg-[#111111]  ">
         <div className="max-w-md flex flex-col  gap-[13rem]">
         <div className="w-[400px] h-[166px]">
-          <h1 className="text-[40px] leading-[3rem] font-outfit font-bold text-white ">
+          <h1 className="text-3xl text-center md:text-left md:text-[40px] leading-[3rem] font-outfit font-bold text-white ">
             Welcome to FimIt Admin Panel
           </h1>
-          <p className="text-lg font-PlusJakarta text-gray-300 ">
+          <p className="text-lg text-center md:text-left p-4 md:p-0 font-PlusJakarta text-gray-300 ">
             Sign in to manage users, floor plans, and scan data securely.
           </p>
           </div>

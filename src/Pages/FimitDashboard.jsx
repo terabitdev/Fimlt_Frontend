@@ -55,7 +55,7 @@ export default function FimitDashboard() {
       
         {/* Welcome */}
         <div className="flex justify-between font-DMSansRegular items-center mb-6">
-          <h1 className="text-3xl font-[500]">Welcome, Zaid!</h1>
+          <h1 className=" text-2xl md:text-3xl font-[500]">Welcome, Zaid!</h1>
           <button 
             onClick={openCategoriesModal} // Use click handler to open modal
             className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md flex items-center"
@@ -66,7 +66,7 @@ export default function FimitDashboard() {
         </div>
         
         {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
           <div className="bg-white flex flex-col gap-8 font-poppins p-4 rounded-lg">
             <div className="flex justify-between">
               <div className="flex items-center">

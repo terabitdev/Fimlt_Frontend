@@ -54,9 +54,9 @@ const RecentFloorScansTable = () => {
     ];
   
     return (
-      <div className="w-full bg-white rounded-lg ">
+      <div className="w-full md:max-w-5xl  max-w-[22rem]  bg-white rounded-lg ">
         <div className="p-6 flex justify-between items-center">
-          <h2 className="text-[27px] font-[600] font-OutfitBold text-[#1A1C21]">Recent Floor Scans Table</h2>
+          <h2 className="text-xl md:text-[27px] font-[600] font-OutfitBold text-[#1A1C21]">Recent Floor Scans Table</h2>
           <FilterByCategories />
         </div>
         

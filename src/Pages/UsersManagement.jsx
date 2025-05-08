@@ -21,13 +21,13 @@ const RecentFloorScansTable = () => {
     ];
   
     return (
-      <div className="w-full bg-white  rounded-lg">
+      <div className="w-full md:max-w-5xl  max-w-[22rem]   bg-white  rounded-lg">
         <div className="p-6">
           <h2 className="text-[27px] font-[600] font-OutfitBold text-[#1A1C21]">Recent Floor Scans Table</h2>
         </div>
         
-        <div className="w-full overflow-x-auto">
-          <table className="w-full divide-y divide-gray-200">
+        <div className=" max-w-xs md:max-w-5xl  overflow-x-auto">
+          <table className="w-full  divide-y divide-gray-200">
             <thead className='text-[12px] font-[600] font-OutfitBold text-black'>
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-900 border-t border-b border-gray-200">

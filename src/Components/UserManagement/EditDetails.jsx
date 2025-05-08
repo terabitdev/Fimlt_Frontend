@@ -52,7 +52,7 @@ function RoomMeasurementInterface() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1E3A5F] rounded-xl">
+    <div className="min-h-screen max-w-[22rem] md:max-w-5xl  bg-[#1E3A5F] rounded-xl">
       {/* User Profile Section */}
       <div className="p-4 border-b border-white flex items-center justify-between">
         <div className="flex flex-col font-monrope">
@@ -72,9 +72,9 @@ function RoomMeasurementInterface() {
         </div>
       </div>
 
-      <div className="flex flex-row justify-between gap-5 max-w-[61rem] mt-10 mx-auto">
+      <div className="flex flex-col md:flex-row justify-between gap-5 max-w-[61rem] mt-10 md:mt-20 mx-auto">
         {/* Room Preview Image */}
-        <div className="flex flex-col gap-5 w-[405px] h-[270px]">
+        <div className="flex flex-col gap-5 md:w-[405px] md:h-[270px] max-w-sm">
           <img
             src="/assets/img2.png"
             alt="Room Preview"
@@ -86,7 +86,7 @@ function RoomMeasurementInterface() {
         </div>
 
         {/* Room Details Table */}
-        <div className="p-4 w-[583px] rounded-3xl bg-white">
+        <div className="p-4 md:w-[583px]  max-w-sm rounded-3xl bg-white">
           <div className="w-full font-SFProDisplay">
             {roomDetails.map((detail, index) => (
               <div key={index} className="flex items-center justify-between py-1 ">
