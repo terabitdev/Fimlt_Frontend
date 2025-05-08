@@ -16,7 +16,7 @@ function RoomMeasurementInterface() {
  
   
     return (
-      <div className="min-h-screen max-w-[22rem] md:max-w-5xl  bg-[#1E3A5F] rounded-xl">
+      <div className="min-h-screen max-w-[22rem] md:max-w-5xl xl:max-w-7xl   bg-[#1E3A5F] rounded-xl">
 
          {/* User Profile Section */}
          <div className="p-4  border-b border-white flex items-center justify-between ">
