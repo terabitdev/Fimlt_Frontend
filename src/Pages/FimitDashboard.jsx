@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import SideBar from '../Components/SideBar';
 import TopBar from '../Components/TopBar';
+import AddCategories from '../Modal/AddCategories';
 import { 
   MoreHorizontal, 
   Users, 
@@ -14,6 +15,7 @@ import {
 
 export default function FimitDashboard() {
   const [selectedMonth, setSelectedMonth] = useState('Month');
+  const [isModalOpen, setIsModalOpen] = useState(false); // State to control modal visibility
   
   // Chart data points (representing the curve)
   const chartData = [
@@ -37,6 +39,10 @@ export default function FimitDashboard() {
     return `${linePath} L100,100 L0,100 Z`;
   };
 
+  // Open and close modal handlers
+  const openCategoriesModal = () => setIsModalOpen(true);
+  const closeCategoriesModal = () => setIsModalOpen(false);
+
   return (
     <div className="flex min-h-screen h-full bg-black text-white">
       {/* Sidebar */}
@@ -50,7 +56,10 @@ export default function FimitDashboard() {
         {/* Welcome */}
         <div className="flex justify-between font-DMSansRegular items-center mb-6">
           <h1 className="text-3xl font-[500]">Welcome, Zaid!</h1>
-          <button className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md flex items-center">
+          <button 
+            onClick={openCategoriesModal} // Use click handler to open modal
+            className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md flex items-center"
+          >
             <Plus size={20} className="mr-2" />
             Add Category
           </button>
@@ -127,7 +136,7 @@ export default function FimitDashboard() {
             </div>
             
             {/* Chart area */}
-            <div className="absolute   left-12 right-0 top-5 bottom-6 overflow-hidden">
+            <div className="absolute left-12 right-0 top-5 bottom-6 overflow-hidden">
               {/* Chart SVG */}
               <svg className="w-full h-full" preserveAspectRatio="none">
                 {/* Area under curve */}
@@ -156,7 +165,7 @@ export default function FimitDashboard() {
               
               {/* February data point indicator */}
               <div className="absolute left-[20%] top-5 bottom-0 flex items-center justify-center pointer-events-none">
-                <div className="h-full w-6 bg-gradient-to-b  from-[#1E3A5F] to-transparent opacity-70 rounded-full"></div>
+                <div className="h-full w-6 bg-gradient-to-b from-[#1E3A5F] to-transparent opacity-70 rounded-full"></div>
                 <div className="absolute left-[12px] top-2 w-4 h-4 bg-white rounded-full border-2 border-white shadow-md transform -translate-x-1/2"></div>
               </div>
             </div>
@@ -169,6 +178,12 @@ export default function FimitDashboard() {
             </div>
           </div>
         </div>
+        
+        {/* Add Categories Modal */}
+        <AddCategories 
+          isOpen={isModalOpen} 
+          onClose={closeCategoriesModal} 
+        />
       </div>
     </div>
   );

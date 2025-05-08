@@ -9,6 +9,7 @@ import ProjectDetails from "./Components/UserManagement/ProjectDetails";
 import EditDetails from "./Components/UserManagement/EditDetails";
 import FloorsPlan from "./Pages/FloorsPlan";
 import ProjectDetailsFloorsPlan from "./Components/FloorsPlan/ProjectDetails";
+import AddCategories from "./Modal/AddCategories";
 
 const ProjectRoutes = () => {
     let element = useRoutes([
@@ -21,6 +22,7 @@ const ProjectRoutes = () => {
         { path : "/edit-details", element: <EditDetails /> },
         { path : "/floors-plan", element: <FloorsPlan /> },
         { path : "/project-details-floors-plan", element: <ProjectDetailsFloorsPlan /> },
+        { path : "/add-categories", element: <AddCategories /> },
         { path : "*", element: <LoginPage /> }, // Redirect to LoginPage for any other route
     ]);
     return element;

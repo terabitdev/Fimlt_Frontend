@@ -10,6 +10,7 @@ export default {
     extend: {
       fontFamily: {
         outfit: ['Outfit', 'sans-serif'],
+        OutfitBold: ['OutfitBold', 'sans-serif'],
         InterTight: ['Inter', 'sans-serif'],
         Inter: ['Inter', 'sans-serif'],
         Objective: ['Objective', 'sans-serif'],
