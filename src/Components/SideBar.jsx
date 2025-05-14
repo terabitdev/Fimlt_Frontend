@@ -1,7 +1,6 @@
 
-
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   Users, 
@@ -10,11 +9,14 @@ import {
   ChevronRight,
   X
 } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase'; 
 
 function SideBar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const location = useLocation(); // Hook to get the current route location
+  const navigate = useNavigate(); // Hook for navigation
   
   // Function to check if the current path matches a given path
   const isActive = (path) => {
@@ -51,6 +53,18 @@ function SideBar() {
     }
   };
 
+  // Logout function
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      // Navigate to login page after successful logout
+      navigate('/'); // Assuming '/' is your login page route
+    } catch (error) {
+      console.error('Error signing out:', error);
+      alert('Failed to log out. Please try again.');
+    }
+  };
+
   // Navigation items
   const navItems = [
     { path: '/dashboard', name: 'Home', icon: <Home className="mr-3" /> },
@@ -83,7 +97,10 @@ function SideBar() {
         </Link>
       ))}
       
-      <div className="mt-auto text-white text-[16px] font-[400] font-DMSansRegular p-3 rounded flex items-center hover:bg-gray-800 cursor-pointer">
+      <div 
+        onClick={handleLogout}
+        className="mt-auto text-white text-[16px] font-[400] font-DMSansRegular p-3 rounded flex items-center hover:bg-gray-800 cursor-pointer"
+      >
         <LogOut className="mr-3" />
         <span>Logout</span>
       </div>

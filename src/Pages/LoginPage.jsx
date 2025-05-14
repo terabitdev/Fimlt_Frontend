@@ -1,12 +1,94 @@
+
 import { useState } from "react";
 import { EyeOff, Eye } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebase"; 
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: ""
+  });
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ""
+      }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Email is invalid";
+    }
+    
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Sign in with Firebase Authentication
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+      
+      // Navigate to dashboard after successful login
+      navigate("/dashboard"); // Adjust the route as needed
+      
+    } catch (error) {
+      console.error("Error signing in:", error);
+      
+      // Handle Firebase auth errors
+      if (error.code === "auth/user-not-found") {
+        setErrors({ email: "No user found with this email" });
+      } else if (error.code === "auth/wrong-password") {
+        setErrors({ password: "Incorrect password" });
+      } else if (error.code === "auth/invalid-email") {
+        setErrors({ email: "Invalid email address" });
+      } else if (error.code === "auth/too-many-requests") {
+        setErrors({ general: "Too many failed attempts. Please try again later." });
+      } else {
+        setErrors({ general: "An error occurred. Please try again." });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -53,25 +135,44 @@ const LoginPage = () => {
             </div>
           </div>
         </div>
-        <div className="w-full max-w-[440px] h-[474px] bg-[#1E3A5F] rounded-2xl p-8 shadow-xl">
+        <div className="w-full max-w-[440px] h-auto bg-[#1E3A5F] rounded-2xl p-8 shadow-xl">
           <h2 className="text-[40px] font-bold font-outfit text-white mb-8 text-center">
             Sign In
           </h2>
 
-          <form className="space-y-4 font-SfProDisplay">
+          {errors.general && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-200 text-sm">
+              {errors.general}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4 font-SfProDisplay">
             <div>
               <input
                 type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
                 placeholder="Email"
-                className="w-full rounded-[16px] bg-[#1E3A5F] text-white p-4 border border-white placeholder:text-white"
+                className={`w-full rounded-[16px] bg-[#1E3A5F] text-white p-4 border placeholder:text-white ${
+                  errors.email ? 'border-red-500' : 'border-white'
+                }`}
               />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+              )}
             </div>
 
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
                 placeholder="Password"
-                className="w-full rounded-[16px] bg-[#1E3A5F] text-white p-4 border border-white placeholder:text-white"
+                className={`w-full rounded-[16px] bg-[#1E3A5F] text-white p-4 border placeholder:text-white pr-12 ${
+                  errors.password ? 'border-red-500' : 'border-white'
+                }`}
               />
               <button
                 type="button"
@@ -80,16 +181,23 @@ const LoginPage = () => {
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-400">{errors.password}</p>
+              )}
             </div>
             
             <button
               type="submit"
-              className="w-full bg-white text-[#1E3A5F] rounded-full py-4 font-[500] text-[18px]"
+              disabled={loading}
+              className={`w-full rounded-full py-4 font-[500] text-[18px] transition-all ${
+                loading 
+                  ? 'bg-gray-400 text-[#1E3A5F] cursor-not-allowed' 
+                  : 'bg-white text-[#1E3A5F] hover:bg-gray-100'
+              }`}
             >
-              Sign in
+              {loading ? "Signing in..." : "Sign in"}
             </button>
         
-
             <div className="text-center mt-4">
               <a href="#" className="text-white hover:underline text-sm">
                 Forgot Password?
