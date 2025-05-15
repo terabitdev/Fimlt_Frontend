@@ -3,8 +3,8 @@ import { useState } from "react";
 import { EyeOff, Eye } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { setDoc, doc } from "firebase/firestore";
-import { auth, db } from "../firebase"; 
+import { setDoc, doc, collection, query, where, getDocs } from "firebase/firestore";
+import { auth, db } from "../firebase"; // Update the path based on your file structure
 
 function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,6 +20,39 @@ function SignUpPage() {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  // Generate a random 5-digit code
+  const generateRandomCode = () => {
+    return Math.floor(10000 + Math.random() * 90000).toString();
+  };
+
+  // Check if code already exists in database
+  const isCodeUnique = async (code) => {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("adminCode", "==", code));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.empty;
+  };
+
+  // Generate unique admin code
+  const generateUniqueAdminCode = async () => {
+    let code;
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    do {
+      code = generateRandomCode();
+      const isUnique = await isCodeUnique(code);
+      if (isUnique) {
+        return code;
+      }
+      attempts++;
+    } while (attempts < maxAttempts);
+    
+    // If we couldn't generate a unique code after max attempts,
+    // append timestamp to ensure uniqueness
+    return code + Date.now().toString().slice(-3);
   };
 
   const handleChange = (e) => {
@@ -83,6 +116,9 @@ function SignUpPage() {
       
       const user = userCredential.user;
       
+      // Generate unique admin code
+      const adminCode = await generateUniqueAdminCode();
+      
       // Create user document in Firestore
       await setDoc(doc(db, "users", user.uid), {
         creationDate: new Date().toLocaleString("en-US", {
@@ -97,7 +133,8 @@ function SignUpPage() {
         email: formData.email,
         name: formData.fullName,
         type: "Admin",
-        uid: user.uid
+        uid: user.uid,
+        adminCode: adminCode // New field for the unique admin code
       });
       
       // Navigate to dashboard or login page after successful signup
@@ -124,7 +161,7 @@ function SignUpPage() {
   return (
     <div className="min-h-screen h-full">
       {/* SignUp Form */}
-      <div className=" flex flex-col lg:w-full h-full lg:h-full  items-center lg:p-8  justify-center gap-10 bg-[url('/assets/LoginPage/bgimg1.png')] bg-cover bg-[#090D00]  ">   
+      <div className=" flex flex-col lg:w-full h-full lg:h-full  items-center lg:p-8  justify-center gap-10 bg-[url('/assets/LoginPage/bgimg1.png')] bg-cover  bg-[#090D00]  ">   
         <div className="flex items-center justify-center gap-2 mt-10">
           <img className="w-[72px] h-[72px]" src="/assets/logo.png" />
           <div className="text-white font-SfProDisplay font-[400] text-3xl ">
