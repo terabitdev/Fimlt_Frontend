@@ -87,10 +87,6 @@ function ProjectDetails() {
        {/* Welcome */}
        <div className="flex justify-between font-DMSansRegular items-center mb-6">
          <h1 className="text-2xl md:text-3xl font-[500]">Project Details</h1>
-         <button className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md flex items-center">
-           <Plus size={20} className="mr-2" />
-           Add Category
-         </button>
        </div>  
            
         {/* Project Details */}
