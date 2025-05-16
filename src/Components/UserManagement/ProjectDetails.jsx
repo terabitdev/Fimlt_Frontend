@@ -231,7 +231,6 @@ function ProjectDetails() {
             );
           } catch (e) {
             console.warn('Could not load model URL:', e);
-            console.error("Error fetching model URL:", e);
           }
         }
         
