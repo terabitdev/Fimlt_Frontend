@@ -301,23 +301,39 @@
 import { useState, useEffect } from 'react';
 import SideBar from '../../Components/SideBar';
 import TopBar from '../../Components/TopBar';
-import { Edit, Trash2, Box, ExternalLink } from 'lucide-react';  // Changed Cube to Box
+import { Edit, Trash2, ExternalLink } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, ref as storageRef, getDownloadURL } from 'firebase/storage';
 import { db } from '../../firebase'; // adjust if needed
-import '@google/model-viewer';      // register the <model-viewer> web component
 
+// This component shows a direct USDZ viewer in the card
 function ProjectCard({ project }) {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  const [modelLoaded, setModelLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [viewerUrl, setViewerUrl] = useState('');
   
-  // Debug info
   useEffect(() => {
-    console.log("Project data:", project);
-    console.log("iOS device:", isIOS);
-    console.log("Model URL:", project.usdFileUrl);
-  }, [project, isIOS]);
+    if (project.usdFileUrl) {
+      // Create a viewer URL using the USDZ file
+      createViewerUrl(project.usdFileUrl);
+    }
+  }, [project.usdFileUrl]);
+  
+  const createViewerUrl = (usdzUrl) => {
+    // Using the modelviewer.dev service which can show various 3D formats including USDZ
+    // This is a CORS-friendly approach that embeds a viewer directly
+    // Note: This is a public service for testing - for production, consider a paid service
+    
+    // URL-encode the model URL for use as a parameter
+    const encodedUrl = encodeURIComponent(usdzUrl);
+    
+    // Create a viewer URL with the USDZ file as a parameter
+    const viewer = `https://modelviewer.dev/shared-assets/viewer.html?src=${encodedUrl}&alt=A%203D%20model%20viewer&ar=true`;
+    
+    setViewerUrl(viewer);
+    setLoading(false);
+  };
 
   return (
     <div className="bg-[#202022] rounded-lg overflow-hidden shadow-lg">
@@ -325,31 +341,48 @@ function ProjectCard({ project }) {
         <div className="w-[147px] h-[100px] relative group">
           {project.usdFileUrl ? (
             <>
-              {/* Visual indicator for 3D model - works on all platforms */}
-              <div className="w-full h-full relative flex items-center justify-center">
-                <div className="absolute inset-0 bg-[#303035] rounded-xl flex flex-col items-center justify-center">
-                  <Box size={32} className="text-white mb-2" />  {/* Changed from Cube to Box */}
-                  <p className="text-white text-xs font-medium">3D Model</p>
-                </div>
-                
-                {/* Overlay action buttons */}
-                {isIOS ? (
-                  <a
-                    href={project.usdFileUrl}
-                    rel="ar"
-                    className="absolute bottom-2 bg-blue-500 text-white text-xs px-3 py-1 rounded-lg z-10"
-                  >
-                    View AR
-                  </a>
+              {/* Use an iframe to embed the 3D viewer */}
+              <div className="w-full h-full rounded-xl overflow-hidden">
+                {loading ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#303035]">
+                    <div className="w-6 h-6 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
+                  </div>
                 ) : (
-                  <Link 
-                    to={`/project-details/${project.id}`} 
-                    className="absolute bottom-2 bg-blue-500 text-white text-xs px-3 py-1 rounded-lg z-10"
-                  >
-                    View Details
-                  </Link>
+                  <iframe
+                    src={viewerUrl}
+                    title={`3D Model: ${project.name}`}
+                    frameBorder="0"
+                    allowFullScreen
+                    style={{
+                      width: '147px',
+                      height: '100px',
+                      backgroundColor: '#202022'
+                    }}
+                    loading="lazy"
+                  ></iframe>
                 )}
               </div>
+              
+              {/* Overlay buttons */}
+              <div className="absolute bottom-1 left-0 right-0 flex justify-center">
+                <Link 
+                  to={`/project-details/${project.id}`} 
+                  className="bg-blue-500 text-white text-xs px-3 py-1 rounded-lg z-10"
+                >
+                  View
+                </Link>
+              </div>
+              
+              {/* iOS AR Quick Look button */}
+              {isIOS && (
+                <a
+                  href={project.usdFileUrl}
+                  rel="ar"
+                  className="absolute top-1 right-1 bg-blue-500 text-white text-xs px-2 py-1 rounded z-10"
+                >
+                  AR
+                </a>
+              )}
             </>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-xl">
@@ -375,7 +408,63 @@ function ProjectCard({ project }) {
   );
 }
 
-// Rest of the components remain the same...
+function FacilityDashboard({ userData, projects, loading }) {
+  const navigate = useNavigate();
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-white">
+        <p>Loading user data...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#1E3A5F] rounded-xl">
+      {/* User Profile Section */}
+      <div className="p-4 pb-6 border-b border-white flex justify-between items-start">
+        <div>
+          <h2 className="text-white font-[600] mb-1">
+            Name: <span className="font-[400]">{userData.name}</span>
+          </h2>
+          <h2 className="text-white font-[600] mb-1">
+            Email: <span className="font-[400]">{userData.email}</span>
+          </h2>
+          <h2 className="text-white font-[600] mb-1">
+            Role: <span className="font-[400]">{userData.role}</span>
+          </h2>
+          <h2 className="text-white font-[600]">
+            Projects: <span className="font-[400]">{projects.length}</span>
+          </h2>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate(`/edit-details/${userData.id}`)}
+            className="bg-[#1E3A5F] border border-white text-white px-3 py-1 rounded-lg text-sm flex items-center"
+          >
+            <Edit size={16} className="mr-1" /> Edit
+          </button>
+          <button className="bg-[#FB0000] border border-[#FB0000] text-white px-3 py-1 rounded-lg text-sm flex items-center">
+            <Trash2 size={16} className="mr-1" /> Delete
+          </button>
+        </div>
+      </div>
+
+      {/* Projects Grid */}
+      {projects.length > 0 ? (
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-5xl mx-auto mt-6">
+          {projects.map((project) => (
+            <ProjectCard key={project.id} project={project} />
+          ))}
+        </div>
+      ) : (
+        <div className="p-8 text-center text-white">
+          <p>No projects found for this user.</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function UserDetails() {
   const { userId } = useParams();
@@ -419,17 +508,12 @@ export default function UserDetails() {
 
             if (data.usdFileUrl) {
               try {
-                // IMPORTANT: Log the original path for debugging
-                console.log("Original storage path:", data.usdFileUrl);
-                
-                // Get a proper download URL from Firebase Storage
                 publicUrl = await getDownloadURL(
                   storageRef(storage, data.usdFileUrl)
                 );
                 console.log("Generated model URL:", publicUrl);
               } catch (e) {
                 console.error('Could not load model URL:', e);
-                console.error('Error details:', e.message);
               }
             }
 
@@ -438,7 +522,6 @@ export default function UserDetails() {
               name: data.name || 'Unnamed Project',
               description: data.description || '',
               usdFileUrl: publicUrl,
-              originalPath: data.usdFileUrl // Keep the original path for reference
             };
           })
         );
@@ -454,7 +537,6 @@ export default function UserDetails() {
     fetchUserData();
   }, [userId]);
 
-  // Component rendering remains the same
   return (
     <div className="flex min-h-screen h-full bg-black text-white">
       <SideBar />
@@ -479,13 +561,14 @@ export default function UserDetails() {
   );
 }
 
-// ProjectDetailPage component with enhanced visualization
+// ProjectDetailPage with enhanced viewing capabilities
 export function ProjectDetailPage() {
   const { projectId } = useParams();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const navigate = useNavigate();
+  const [viewerUrl, setViewerUrl] = useState('');
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -502,9 +585,13 @@ export function ProjectDetailPage() {
         if (data.usdFileUrl) {
           try {
             const storage = getStorage();
-            console.log("Detail page original path:", data.usdFileUrl);
             modelUrl = await getDownloadURL(storageRef(storage, data.usdFileUrl));
             console.log("Detail page model URL:", modelUrl);
+            
+            // Create viewer URL
+            const encodedUrl = encodeURIComponent(modelUrl);
+            const viewer = `https://modelviewer.dev/shared-assets/viewer.html?src=${encodedUrl}&alt=${encodeURIComponent(data.name || 'A 3D model')}&ar=true&camera-controls=true&auto-rotate=true`;
+            setViewerUrl(viewer);
           } catch (e) {
             console.error('Could not load model URL:', e);
           }
@@ -570,19 +657,24 @@ export function ProjectDetailPage() {
             <div className="mb-6">
               <h2 className="text-xl font-[500] mb-4">3D Model Viewer</h2>
               
-              <div className="bg-[#202022] p-8 rounded-lg">
-                {/* 3D Model visual indicator */}
-                <div className="flex flex-col items-center justify-center mb-6">
-                  <Box size={64} className="text-white mb-3" />  {/* Changed from Cube to Box */}
-                  <h3 className="text-xl text-white mb-2">3D Model Available</h3>
-                  <p className="text-gray-400 text-center max-w-md">
-                    This project includes a 3D model created with ARKit
-                  </p>
+              <div className="bg-[#202022] p-4 rounded-lg">
+                {/* Large embedded viewer iframe */}
+                <div className="w-full h-96 mb-6 rounded-lg overflow-hidden">
+                  <iframe
+                    src={viewerUrl}
+                    title={`3D Model: ${project.name}`}
+                    frameBorder="0"
+                    allowFullScreen
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      backgroundColor: '#303035'
+                    }}
+                  ></iframe>
                 </div>
                 
-                <div className="flex justify-center mt-6">
-                  {isIOS ? (
-                    // iOS AR Quick Look button
+                <div className="flex flex-wrap justify-center gap-4 mt-6">
+                  {isIOS && (
                     <a
                       href={project.usdFileUrl}
                       rel="ar"
@@ -591,102 +683,43 @@ export function ProjectDetailPage() {
                       <ExternalLink size={18} className="mr-2" />
                       View in AR
                     </a>
-                  ) : (
-                    // Non-iOS download button
-                    <a
-                      href={project.usdFileUrl}
-                      download
-                      className="bg-white text-[#0D0D12] px-6 py-3 rounded-lg inline-flex items-center font-medium"
-                    >
-                      <ExternalLink size={18} className="mr-2" />
-                      Download 3D Model
-                    </a>
                   )}
+                  
+                  <a
+                    href={project.usdFileUrl}
+                    download
+                    className="bg-white text-[#0D0D12] px-6 py-3 rounded-lg inline-flex items-center font-medium"
+                  >
+                    <ExternalLink size={18} className="mr-2" />
+                    Download USDZ
+                  </a>
+                  
+                  <a
+                    href={viewerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-gray-700 text-white px-6 py-3 rounded-lg inline-flex items-center font-medium"
+                  >
+                    <ExternalLink size={18} className="mr-2" />
+                    Open in Full Screen
+                  </a>
                 </div>
                 
-                {!isIOS && (
-                  <p className="text-gray-400 text-center text-sm mt-4">
-                    This 3D model is in USDZ format, optimized for iOS devices.
-                    For the best AR experience, view on an iPhone or iPad.
-                  </p>
-                )}
-                
-                {/* Add direct model URL for troubleshooting - remove in production */}
-                <div className="mt-8 pt-4 border-t border-gray-700">
-                  <p className="text-xs text-gray-500 break-all">
-                    Model URL: {project.usdFileUrl}
-                  </p>
+                {/* Instructions for best experience */}
+                <div className="mt-6 p-4 border border-gray-700 rounded-lg">
+                  <h3 className="text-white text-lg mb-2">Viewing Instructions</h3>
+                  <ul className="text-gray-300 space-y-2 list-disc pl-5">
+                    <li>Use mouse to rotate the model (click and drag)</li>
+                    <li>Scroll to zoom in and out</li>
+                    <li>Right-click and drag to pan the view</li>
+                    {isIOS && <li>Tap "View in AR" to see the model in your real environment</li>}
+                  </ul>
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-// Don't forget to add ProjectDetailPage to your routes
-/* 
-In your routing configuration:
-import { ProjectDetailPage } from './path/to/UserDetails';
-<Route path="/project-details/:projectId" element={<ProjectDetailPage />} />
-*/
-
-function FacilityDashboard({ userData, projects, loading }) {
-  const navigate = useNavigate();
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-white">
-        <p>Loading user data...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#1E3A5F] rounded-xl">
-      {/* User Profile Section */}
-      <div className="p-4 pb-6 border-b border-white flex justify-between items-start">
-        <div>
-          <h2 className="text-white font-[600] mb-1">
-            Name: <span className="font-[400]">{userData.name}</span>
-          </h2>
-          <h2 className="text-white font-[600] mb-1">
-            Email: <span className="font-[400]">{userData.email}</span>
-          </h2>
-          <h2 className="text-white font-[600] mb-1">
-            Role: <span className="font-[400]">{userData.role}</span>
-          </h2>
-          <h2 className="text-white font-[600]">
-            Projects: <span className="font-[400]">{projects.length}</span>
-          </h2>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => navigate(`/edit-details/${userData.id}`)}
-            className="bg-[#1E3A5F] border border-white text-white px-3 py-1 rounded-lg text-sm flex items-center"
-          >
-            <Edit size={16} className="mr-1" /> Edit
-          </button>
-          <button className="bg-[#FB0000] border border-[#FB0000] text-white px-3 py-1 rounded-lg text-sm flex items-center">
-            <Trash2 size={16} className="mr-1" /> Delete
-          </button>
-        </div>
-      </div>
-
-      {/* Projects Grid */}
-      {projects.length > 0 ? (
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-5xl mx-auto mt-6">
-          {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      ) : (
-        <div className="p-8 text-center text-white">
-          <p>No projects found for this user.</p>
-        </div>
-      )}
     </div>
   );
 }
