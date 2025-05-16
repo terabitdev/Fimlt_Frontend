@@ -86,7 +86,7 @@ export default function FimitDashboard() {
       // Fetch users associated with this admin
       const usersQuery = query(
         collection(db, 'users'),
-        where('associatedAdminCode', '==', adminCode),
+        where('refralCode', '==', adminCode),
         where('type', '==', 'User')
       );
       const usersSnapshot = await getDocs(usersQuery);
