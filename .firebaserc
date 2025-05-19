@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "production": "daily-helper-74a49",
+    "default": "daily-helper-74a49"
+  },
+  "targets": {},
+  "etags": {}
+}

@@ -183,7 +183,7 @@ const RecentFloorScansTable = () => {
                     {scan.room}
                   </td>
                   <td className="px-6 py-2 whitespace-nowrap">
-                    <Link to={`/project-details/${scan.id}`}>
+                    <Link to={`/project-details-floors-plan/${scan.id}`}>
                       <button className="inline-flex items-center bg-[#1E3A5F] justify-center p-2 bg-navy-800 text-white rounded-md">
                         <Eye size={20} />
                       </button>

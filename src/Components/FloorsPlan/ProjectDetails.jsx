@@ -1,35 +1,143 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebase"; // Import the Firebase setup from your firebase.js file
 import SideBar from "../SideBar";
 import TopBar from "../TopBar";
-import { Plus } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom"; // Import useParams hook
 import React from "react";
 import FilterByCategories from "./FilterByCategories";
 
 function RoomMeasurementInterface() {
+  // Get project ID from URL params
+  const { projectId } = useParams(); // Extract projectId from URL
+  
+  // State for project data
   const [userData, setUserData] = useState({
-    projectname: "Office–2nd Floor",
-    scannedby: "Marvin McKinney",
-    date: "23 Mar, 10:30 AM",
+    projectname: "",
+    scannedby: "",
+    date: "",
   });
+  
+  // State for facilities (using other projects as facilities)
+  const [facilities, setFacilities] = useState([]);
+  
+  // Loading and error states
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const facilities = [
-    {
-      id: 1,
-      name: "Main Office",
-      description: "Finance Department Layout",
-      image: "/img2",
-    },
-    { id: 2, name: "ICU Wing", description: "City Hospital", image: "/img1" },
-    { id: 3, name: "Ground Layout", description: "Green Mall", image: "/img2" },
-    { id: 4, name: "Basement", description: "Arena Tower", image: "/img1" },
-    { id: 5, name: "Main Office", description: "Finance Department Layout", image: "/img2" },
-    { id: 6, name: "ICU Wing", description: "City Hospital", image: "/img1" },
-    { id: 7, name: "Ground Layout", description: "Green Mall", image: "/img2" },
-    { id: 8, name: "Basement", description: "Arena Tower", image: "/img1" },
-    { id: 8, name: "Basement", description: "Arena Tower", image: "/img1" },
+  // Format date helper function
+  const formatDate = (date) => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = months[date.getMonth()];
+    const hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const formattedHours = (hours % 12 || 12).toString();
+    
+    return `${day} ${month}, ${formattedHours}:${minutes} ${ampm}`;
+  };
 
-  ];
+  useEffect(() => {
+    const fetchProjectData = async () => {
+      try {
+        // Now using the projectId from URL params
+        if (!projectId) {
+          setError("No project ID provided");
+          setLoading(false);
+          return;
+        }
+        
+        // Fetch project details
+        const projectRef = doc(db, "projects", projectId);
+        const projectSnap = await getDoc(projectRef);
+        
+        if (projectSnap.exists()) {
+          const projectData = projectSnap.data();
+          
+          // Get users to match with project creator
+          const usersRef = collection(db, "users");
+          const usersSnapshot = await getDocs(usersRef);
+          
+          // Create a map of user UIDs to names for quick lookup
+          const userMap = {};
+          usersSnapshot.forEach((userDoc) => {
+            const userData = userDoc.data();
+            if (userData.uid) {
+              userMap[userData.uid] = userData.name || "Unknown User";
+            }
+          });
+          
+          // Get the date
+          const date = projectData.creationDate ? 
+            new Date(projectData.creationDate.toDate ? projectData.creationDate.toDate() : projectData.creationDate) : 
+            new Date();
+          
+          const formattedDate = formatDate(date);
+          
+          // Get the user who scanned/created the project
+          const creatorID = projectData.creatorID;
+          let scannedBy = "Unknown User";
+          
+          if (creatorID && userMap[creatorID]) {
+            scannedBy = userMap[creatorID];
+          }
+          
+          setUserData({
+            projectname: projectData.name || "Unnamed Project",
+            scannedby: scannedBy,
+            date: formattedDate,
+          });
+          
+          // Since we only want the project from the URL param,
+          // we don't need to fetch additional projects
+          const facilitiesData = [];
+          
+          // The projectData variable already contains the data of the current project
+          // Let's use that directly to create our single facility item
+          
+          // Count rooms from roomData array if available
+          const roomCount = Array.isArray(projectData.roomData) ? projectData.roomData.length : 0;
+          
+          // Create a single facility item from the current project
+          facilitiesData.push({
+            id: projectId,
+            name: projectData.name || "Unnamed Project",
+            description: `${roomCount} Rooms`,
+            imageUrl: projectData.imageUrl || null,
+            category: projectData.category || "Unknown"
+          });
+          
+          setFacilities(facilitiesData);
+        } else {
+          setError("Project not found");
+        }
+      } catch (err) {
+        console.error("Error fetching project data:", err);
+        setError("Failed to load project data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjectData();
+  }, [projectId]); // Add projectId as dependency so effect runs when it changes
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#1E3A5F] rounded-xl flex justify-center items-center">
+        <div className="text-white text-xl">Loading project data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#1E3A5F] rounded-xl flex justify-center items-center">
+        <div className="text-white text-xl">Error: {error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#1E3A5F] rounded-xl">
@@ -57,35 +165,44 @@ function RoomMeasurementInterface() {
         </div>
       </div>
 
-      {/* Facilities Grid */}
-      <div className="p- grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-5xl mx-4 mt-6">
-        {facilities.map((facility) => (
-          <div
-            key={facility.id}
-            className="bg-[#202022] rounded-lg overflow-hidden shadow-lg"
-          >
-            <div className="p-4 flex gap-5">
-              <div className=" w-[147px] h-[100px]  ">
-                <img
-                  src={`/assets/${facility.image}.png`}
-                  alt={facility.name}
-                  className="w-full h-full object-cover rounded-xl"
-                />
-              </div>
-              <div className="flex flex-col gap-2 justify-center font-SFProDisplay  ">
-                <h3 className="text-white leading-3 font-medium  ">
-                  {facility.name}
-                </h3>
-                <p className="text-white text-xs">{facility.description}</p>
-                <Link to={`/project-details`}>
-                  <button className="w-32 bg-white text-[#0D0D12] rounded-full px-2 py-2 text-xs font-medium">
-                    View
-                  </button>
-                </Link>
+      {/* Facility Card - Single Project */}
+      <div className="p- grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-4 mt-6">
+        {facilities.length > 0 ? (
+          facilities.map((facility) => (
+            <div
+              key={facility.id}
+              className="bg-[#202022] rounded-lg overflow-hidden shadow-lg"
+            >
+              <div className="p-4 flex flex-row gap-4 ">
+                <div className="w-full md:w-[150px] h-[150px] mb-4 md:mb-0">
+                  <img
+                    src={facility.imageUrl || `/assets/img1.png`}
+                    alt={facility.name}
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                </div>
+                <div className="flex flex-col gap-2 justify-center font-SFProDisplay">
+                  <h3 className="text-white text-xl font-medium">
+                    {facility.name}
+                  </h3>
+                  <p className="text-white">{facility.category}</p>
+                  
+                  <div className="flex gap-3">
+                     <Link to={`/project-details/${facility.id}`}>
+                    <button className="bg-white text-[#0D0D12] rounded-lg px-4 py-2 text-sm font-medium">
+                      View 
+                    </button>
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
+          ))
+        ) : (
+          <div className="text-center text-white py-10">
+            Project details not available.
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
