@@ -14,8 +14,8 @@
 
 [build]
   command = "npm install --legacy-peer-deps && npm run build"
-  publish = "build"  # or your actual build output directory
+  publish = "build" 
 
 [build.environment]
-  NODE_VERSION = "18.19.1"  # Using a stable LTS Node version
-  NPM_VERSION = "10.2.4"    # Compatible npm version
+  NODE_VERSION = "18.19.1"  
+  NPM_VERSION = "10.2.4"    
