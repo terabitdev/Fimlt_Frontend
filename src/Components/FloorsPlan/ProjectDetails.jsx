@@ -156,12 +156,6 @@ function RoomMeasurementInterface() {
         </div>
         <div className="flex flex-col md:flex-row gap-2 font-Urbanist">
           <FilterByCategories />
-          <button className="bg-[#1E3A5F] border border-white text-white px-3 py-1 rounded-lg text-sm">
-            Edit
-          </button>
-          <button className="bg-[#FB0000] border border-[#FB0000] text-white px-3 py-1 rounded-lg text-sm">
-            Delete
-          </button>
         </div>
       </div>
 

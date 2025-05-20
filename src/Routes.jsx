@@ -19,7 +19,7 @@ const ProjectRoutes = () => {
         { path: "/users-management", element: <UsersManagement /> },
         { path: "/user-details/:userId", element: <UserDetails /> }, // Added userId parameter
         { path: "/project-details/:projectId", element: <ProjectDetails /> }, // Added projectId parameter
-        { path: "/edit-details/:userId", element: <EditDetails /> }, // Added userId parameter
+        { path: "/edit-details/:projectId", element: <EditDetails /> }, // Added userId parameter
         { path: "/floors-plan", element: <FloorsPlan /> },
         { path: "/project-details-floors-plan/:projectId", element: <ProjectDetailsFloorsPlan /> }, // Added projectId parameter
         { path: "/add-categories", element: <AddCategories /> },
