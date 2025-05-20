@@ -1,13 +1,7 @@
 [build]
-  publish = "dist"
-  command = "npm run build"
-
-[[headers]]
-  for = "/*.js"
-  [headers.values]
-    Content-Type = "text/javascript"
- 
+  command = "npm install --force && npm run build"
+  publish = "build"  # or your actual build output directory
 
 [build.environment]
-  NODE_VERSION = "18.19.1"  
-  NPM_VERSION = "10.2.4"    
+  NODE_VERSION = "18.19.1"  # Using a stable LTS Node version
+  NPM_VERSION = "10.2.4"    # Compatible npm version
