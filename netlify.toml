@@ -6,11 +6,7 @@
   for = "/*.js"
   [headers.values]
     Content-Type = "text/javascript"
-
-
-[build]
-  command = "npm install --legacy-peer-deps && npm run build"
-  publish = "build" 
+ 
 
 [build.environment]
   NODE_VERSION = "18.19.1"  
