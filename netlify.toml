@@ -11,3 +11,11 @@
   for = "/*.mjs"
   [headers.values]
     Content-Type = "text/javascript"
+
+[build]
+  command = "npm install --legacy-peer-deps && npm run build"
+  publish = "build"  # or your actual build output directory
+
+[build.environment]
+  NODE_VERSION = "18.19.1"  # Using a stable LTS Node version
+  NPM_VERSION = "10.2.4"    # Compatible npm version
