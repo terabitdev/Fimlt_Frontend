@@ -7,10 +7,6 @@
   [headers.values]
     Content-Type = "text/javascript"
 
-[[headers]]
-  for = "/*.mjs"
-  [headers.values]
-    Content-Type = "text/javascript"
 
 [build]
   command = "npm install --legacy-peer-deps && npm run build"
