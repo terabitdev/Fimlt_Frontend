@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { Eye } from 'lucide-react';
 import SideBar from '../Components/SideBar';
 import TopBar from '../Components/TopBar';
@@ -7,12 +9,14 @@ import FilterByCategories from '../Components/FloorsPlan/FilterByCategories';
 import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
-const RecentFloorScansTable = () => {
+const RecentFloorScansTable = ({ searchTerm = '', onSearchHandlerReady }) => {
   const [scansData, setScansData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
 
   // Format the date helper function
   const formatDate = (date) => {
@@ -79,7 +83,8 @@ const RecentFloorScansTable = () => {
           
           projects.push({
             id: doc.id,
-            projectname: data.name || "Unnamed Project",
+            projectname: data.name || "Unnamed Project", // Store as projectname for display
+            name: data.name || "Unnamed Project", // Keep original name field for searching
             scannedBy: scannedBy,
             date: formattedDate,
             room: `${roomCount} Rooms`,
@@ -100,23 +105,54 @@ const RecentFloorScansTable = () => {
     fetchProjects();
   }, []);
 
-  // Handle filter changes
-  const handleFilterChange = (categories) => {
-    setSelectedCategories(categories);
+  // Update internal search term when parent prop changes
+  useEffect(() => {
+    setInternalSearchTerm(searchTerm);
+    setIsSearchActive(!!searchTerm);
+  }, [searchTerm]);
+
+  // Apply both search and category filters
+  const applyFilters = useCallback(() => {
+    let result = scansData;
     
-    if (categories.length === 0) {
-      // If no categories selected, show all data
-      setFilteredData(scansData);
-    } else {
-      // Filter data based on selected categories
-      const filtered = scansData.filter(scan => 
-        categories.some(cat => 
+    // Apply category filter if categories are selected
+    if (selectedCategories.length > 0) {
+      result = result.filter(scan => 
+        selectedCategories.some(cat => 
           scan.category.toLowerCase().includes(cat.toLowerCase())
         )
       );
-      setFilteredData(filtered);
     }
+    
+    // Apply search term filter if search is active
+    if (internalSearchTerm) {
+      const term = internalSearchTerm.toLowerCase();
+      result = result.filter(scan => 
+        // Search in both name and projectname fields to be safe
+        (scan.name && scan.name.toLowerCase().includes(term)) || 
+        (scan.projectname && scan.projectname.toLowerCase().includes(term))
+      );
+    }
+    
+    setFilteredData(result);
+  }, [internalSearchTerm, selectedCategories, scansData]);
+
+  // Handle filter changes
+  const handleFilterChange = (categories) => {
+    setSelectedCategories(categories);
   };
+
+  // Re-apply filters when dependencies change
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+
+  // No need for search handler since we're getting the search term directly as a prop
+  useEffect(() => {
+    if (onSearchHandlerReady) {
+      onSearchHandlerReady(true);
+    }
+  }, [onSearchHandlerReady]);
 
   if (loading) {
     return (
@@ -140,8 +176,10 @@ const RecentFloorScansTable = () => {
 
   return (
     <div className="w-full md:max-w-5xl xl:max-w-7xl max-w-[22rem] bg-white rounded-lg">
-      <div className="p-6 flex justify-between items-center">
-        <h2 className="text-xl md:text-[27px] font-[600] font-OutfitBold text-[#1A1C21]">Recent Floor Scans Table</h2>
+      <div className="p-6 flex justify-between items-center flex-wrap">
+        <div>
+          <h2 className="text-xl md:text-[27px] font-[600] font-OutfitBold text-[#1A1C21]">Recent Floor Scans Table</h2>
+        </div>
         <FilterByCategories onFilterChange={handleFilterChange} />
       </div>
       
@@ -184,7 +222,7 @@ const RecentFloorScansTable = () => {
                   </td>
                   <td className="px-6 py-2 whitespace-nowrap">
                     <Link to={`/project-details-floors-plan/${scan.id}`}>
-                      <button className="inline-flex items-center bg-[#1E3A5F] justify-center p-2 bg-navy-800 text-white rounded-md">
+                      <button className="inline-flex items-center bg-[#1E3A5F] justify-center p-2 text-white rounded-md hover:bg-[#2d4a73] transition-colors">
                         <Eye size={20} />
                       </button>
                     </Link>
@@ -196,9 +234,11 @@ const RecentFloorScansTable = () => {
         ) : (
           <div className="flex justify-center items-center h-48">
             <p className="text-gray-500 text-lg">
-              {selectedCategories.length > 0 
-                ? "No projects found with the selected categories" 
-                : "No projects found"}
+              {isSearchActive 
+                ? `No projects found matching "${internalSearchTerm}"${selectedCategories.length > 0 ? " with the selected categories" : ""}`
+                : selectedCategories.length > 0 
+                  ? "No projects found with the selected categories" 
+                  : "No projects found"}
             </p>
           </div>
         )}
@@ -208,6 +248,22 @@ const RecentFloorScansTable = () => {
 };
 
 function FloorsPlan() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [searchHandlerReady, setSearchHandlerReady] = useState(false);
+
+  // Function to pass to TopBar for handling search
+  const handleTopBarSearch = useCallback((term) => {
+    setSearchTerm(term || '');
+    setIsSearchActive(!!term);
+  }, []);
+
+  // Function to clear search
+  const clearSearch = useCallback(() => {
+    setSearchTerm('');
+    setIsSearchActive(false);
+  }, []);
+
   return (
     <div className="flex min-h-screen h-full bg-black text-white">
       {/* Sidebar */}
@@ -215,14 +271,34 @@ function FloorsPlan() {
       
       {/* Main Content */}
       <div className="flex-1 p-6">
-        {/* Top Bar */}
-        <TopBar />
-        {/* Welcome */}
+        {/* Top Bar with search capability */}
+        <TopBar onSearch={handleTopBarSearch} searchType="projects" />
+        
+        {/* Header */}
         <div className="flex justify-between font-DMSansRegular items-center mb-6">
-          <h1 className="text-3xl font-[500]">Floors Plan</h1>
+          <div>
+            <h1 className="text-3xl font-[500]">Floors Plan</h1>
+            {isSearchActive && (
+              <p className="text-gray-400 mt-1">
+                Searching for "{searchTerm}"
+              </p>
+            )}
+          </div>
+          {isSearchActive && (
+            <button 
+              onClick={clearSearch}
+              className="bg-gray-700 text-white py-2 px-4 rounded-md hover:bg-gray-600 transition-colors"
+            >
+              Clear Search
+            </button>
+          )}
         </div>
+        
         {/* Floor Scans Table */}
-        <RecentFloorScansTable />
+        <RecentFloorScansTable 
+          searchTerm={searchTerm}
+          onSearchHandlerReady={setSearchHandlerReady} 
+        />
       </div>
     </div>
   );

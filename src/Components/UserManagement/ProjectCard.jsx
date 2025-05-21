@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -9,10 +10,21 @@ export default function ProjectCard({ project }) {
   const [processedUrl, setProcessedUrl] = useState(null);
   const [modelType, setModelType] = useState('auto');
   const [previewImageUrl, setPreviewImageUrl] = useState(null);
+  const [isIOSDevice, setIsIOSDevice] = useState(false);
   const threeContainerRef = useRef(null);
   const rendererRef = useRef(null);
   const roomModelRef = useRef(null);
   const [modelId, setModelId] = useState(null);
+
+  // Detect iOS device on component mount
+  useEffect(() => {
+    const checkIsIOS = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      return /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+    };
+    
+    setIsIOSDevice(checkIsIOS());
+  }, []);
 
   // Clean up Three.js resources on unmount
   useEffect(() => {
@@ -56,17 +68,29 @@ export default function ProjectCard({ project }) {
   // Process the model URL
   useEffect(() => {
     if (!project.usdFileUrl) {
+      console.error('No model URL provided for project:', project.id);
       setStatus('error');
       return;
     }
+
+    console.log('Processing model URL:', project.usdFileUrl);
 
     // Reset model to ensure we load the correct one
     if (roomModelRef.current) {
       roomModelRef.current = null;
     }
 
-    processModelFile(project.usdFileUrl);
-  }, [project.usdFileUrl]);
+    // For iOS devices, we can use USDZ directly
+    if (isIOSDevice && project.usdFileUrl.toLowerCase().endsWith('.usdz')) {
+      console.log('iOS device detected, using USDZ directly');
+      setProcessedUrl(project.usdFileUrl);
+      setModelType('usdz');
+      setStatus('success');
+    } else {
+      // For other devices, process the model file
+      processModelFile(project.usdFileUrl);
+    }
+  }, [project.usdFileUrl, isIOSDevice]);
 
   // Display a preview image extracted from USDZ
   const showPreviewImage = () => {
@@ -145,7 +169,7 @@ export default function ProjectCard({ project }) {
         return Math.abs(seed);
       };
       
-      // THIS IS THE FIX: Use let instead of const for the seed
+      // Use let instead of const for the seed
       let seedValue = generateSeed(id || 'default');
       
       // Simple random function using the seed
@@ -381,19 +405,32 @@ export default function ProjectCard({ project }) {
     };
   };
 
-  // Process and convert model file if needed
+  // UPDATED: Process and convert model file if needed
   const processModelFile = async (fileUrl) => {
     setStatus('loading');
     
     try {
-      // Add a cache buster to avoid caching issues
-      const urlWithCacheBuster = `${fileUrl}${fileUrl.includes('?') ? '&' : '?'}cacheBuster=${Date.now()}`;
+      console.log('Processing file URL:', fileUrl);
       
-      // 1. Fetch the file
-      const response = await fetch(urlWithCacheBuster);
+      // Get the file extension from URL
+      const fileExtension = fileUrl.split('?')[0].split('.').pop().toLowerCase();
+      console.log('File extension:', fileExtension);
+      
+      // For USDZ files, try to use them directly first
+      if (fileExtension === 'usdz') {
+        console.log('USDZ file detected, attempting to use directly with model-viewer');
+        setProcessedUrl(fileUrl);
+        setModelType('usdz');
+        setStatus('success');
+        return;
+      }
+      
+      // For other formats, fetch the file to determine content type
+      const response = await fetch(fileUrl);
       const contentType = response.headers.get('content-type');
+      console.log('Content type:', contentType);
       
-      // Check if it's already a supported format for model-viewer
+      // Check if it's a supported format for model-viewer
       if (contentType && (
           contentType.includes('model/gltf') || 
           contentType.includes('model/gltf-binary') ||
@@ -406,86 +443,93 @@ export default function ProjectCard({ project }) {
         return;
       }
       
-      // If it's a USDZ file (ZIP archive)
+      // If it's a USDZ file based on content type
       if (contentType && (
           contentType.includes('model/vnd.usdz+zip') || 
-          contentType.includes('application/zip') || 
-          fileUrl.toLowerCase().endsWith('.usdz')
+          contentType.includes('application/zip')
         )) {
         
+        // Try to use it directly with model-viewer
+        console.log('USDZ file detected via content-type, attempting to use directly');
+        setProcessedUrl(fileUrl);
+        setModelType('usdz');
+        setStatus('success');
+        
+        // Also try to extract preview image as fallback
         try {
-          // Try to process the USDZ file
           const arrayBuffer = await response.arrayBuffer();
-          await handleUSDZFile(arrayBuffer);
+          await extractPreviewFromUSDZ(arrayBuffer);
         } catch (err) {
-          // If USDZ processing fails, go to fallback
-          setStatus('fallback');
+          console.warn('Failed to extract preview image:', err);
+          // Continue with direct display attempt
         }
-      } else if (contentType && contentType.includes('model/vnd.usd') || 
-                fileUrl.toLowerCase().match(/\.(usd|usda|usdc)$/)) {
-        // Handle raw USD file
-        setStatus('fallback');
-      } else {
-        // Unknown format - try direct loading first
+        
+        return;
+      }
+      
+      // If we get here, try to extract content or fall back to placeholder
+      if (contentType && contentType.includes('application/octet-stream') || 
+          contentType && contentType.includes('application/zip')) {
         try {
-          setProcessedUrl(fileUrl);
-          setModelType('auto');
-          setStatus('success');
-        } catch (e) {
-          setStatus('fallback');
+          const arrayBuffer = await response.arrayBuffer();
+          await extractPreviewFromUSDZ(arrayBuffer);
+        } catch (err) {
+          console.warn('Failed to extract content:', err);
         }
       }
+      
+      // If all attempts fail, use the 3D visualization fallback
+      setStatus('fallback');
+      
     } catch (err) {
+      console.error('Error processing model file:', err);
       setStatus('fallback');
     }
   };
 
-  // Handle USDZ file extraction
-  const handleUSDZFile = async (arrayBuffer) => {
+  // Extract preview image from USDZ file
+  const extractPreviewFromUSDZ = async (arrayBuffer) => {
     try {
-      // First, try to extract preview image or other content from the USDZ file
-      try {
-        // Load the zip file
-        const zip = new JSZip();
-        const contents = await zip.loadAsync(arrayBuffer);
-        
-        // Extract preview image if available
-        const imageTypes = ['.png', '.jpg', '.jpeg'];
-        const imageFile = Object.keys(contents.files).find(filename => 
-          imageTypes.some(ext => filename.toLowerCase().endsWith(ext)) && 
-          !contents.files[filename].dir
-        );
-        
-        if (imageFile) {
-          // Use image from USDZ as preview
-          const imageData = await contents.files[imageFile].async('blob');
-          const imageURL = URL.createObjectURL(imageData);
-          setPreviewImageUrl(imageURL);
-        }
-        
-        // Look for GLB file in the USDZ package (rare but possible)
-        const glbFile = Object.keys(contents.files).find(filename => 
-          filename.toLowerCase().endsWith('.glb') && !contents.files[filename].dir
-        );
-        
-        if (glbFile) {
-          // Extract GLB file
-          const fileData = await contents.files[glbFile].async('blob');
-          const fileURL = URL.createObjectURL(fileData);
-          setProcessedUrl(fileURL);
-          setModelType('glb');
-          setStatus('success');
-          return;
-        }
-      } catch (zipErr) {
-        // Continue to fallback if ZIP extraction fails
+      // Load the zip file
+      const zip = new JSZip();
+      const contents = await zip.loadAsync(arrayBuffer);
+      
+      console.log('USDZ contents:', Object.keys(contents.files));
+      
+      // Extract preview image if available
+      const imageTypes = ['.png', '.jpg', '.jpeg'];
+      const imageFile = Object.keys(contents.files).find(filename => 
+        imageTypes.some(ext => filename.toLowerCase().endsWith(ext)) && 
+        !contents.files[filename].dir
+      );
+      
+      if (imageFile) {
+        // Use image from USDZ as preview
+        const imageData = await contents.files[imageFile].async('blob');
+        const imageURL = URL.createObjectURL(imageData);
+        console.log('Found preview image in USDZ:', imageFile);
+        setPreviewImageUrl(imageURL);
       }
       
-      // If we get here, we couldn't extract usable content from the USDZ
-      // Fall back to our custom visualization
-      setStatus('fallback');
+      // Look for GLB file in the USDZ package (rare but possible)
+      const glbFile = Object.keys(contents.files).find(filename => 
+        filename.toLowerCase().endsWith('.glb') && !contents.files[filename].dir
+      );
+      
+      if (glbFile) {
+        // Extract GLB file
+        const fileData = await contents.files[glbFile].async('blob');
+        const fileURL = URL.createObjectURL(fileData);
+        setProcessedUrl(fileURL);
+        setModelType('glb');
+        setStatus('success');
+        return true;
+      }
+      
+      return false;
     } catch (err) {
-      setStatus('fallback');
+      console.warn('Error extracting from USDZ:', err);
+      return false;
     }
   };
 
@@ -515,12 +559,14 @@ export default function ProjectCard({ project }) {
           
           {status === 'success' && processedUrl && (
             <model-viewer
-              src={processedUrl}
+              src={modelType !== 'usdz' ? processedUrl : ''}
+              ios-src={modelType === 'usdz' ? processedUrl : ''}
               alt={project.name}
-              ar
-              ar-modes="webxr scene-viewer quick-look"
+              ar={isIOSDevice}
+              ar-modes={isIOSDevice ? "webxr scene-viewer quick-look" : undefined}
               auto-rotate
               camera-controls
+              interaction-prompt="none"
               format={modelType}
               style={{
                 width: '147px',
@@ -528,8 +574,11 @@ export default function ProjectCard({ project }) {
                 borderRadius: '0.5rem',
                 backgroundColor: '#000000'
               }}
-              onError={() => setStatus('fallback')}
-            />
+              onError={(error) => {
+                console.error('Model viewer error:', error);
+                setStatus('fallback');
+              }}
+            ></model-viewer>
           )}
         </div>
         <div className="flex flex-col gap-2 justify-center font-SFProDisplay">
@@ -549,3 +598,7 @@ export default function ProjectCard({ project }) {
     </div>
   );
 }
+
+
+
+

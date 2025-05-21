@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Eye } from 'lucide-react';
 import SideBar from '../Components/SideBar';
@@ -72,11 +71,8 @@ const RecentFloorScansTable = ({ usersData, loading }) => {
                     </Link>
                   </td>
                 </tr>
-                
               ))
-              
             )}
-            
           </tbody>
         </table>
       </div>
@@ -86,8 +82,10 @@ const RecentFloorScansTable = ({ usersData, loading }) => {
 
 function UsersManagement() {
   const [usersData, setUsersData] = useState([]);
+  const [filteredUsersData, setFilteredUsersData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adminCode, setAdminCode] = useState('');
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -123,7 +121,7 @@ function UsersManagement() {
     try {
       setLoading(true);
       
-      // Query users with matching adminCode
+      // Query users with matching adminCode (refralCode in your case)
       const usersQuery = query(
         collection(db, 'users'),
         where('refralCode', '==', adminCode),
@@ -157,6 +155,7 @@ function UsersManagement() {
       }
       
       setUsersData(users);
+      setFilteredUsersData(users); // Initialize filtered data with all users
     } catch (error) {
       console.error('Error fetching users data:', error);
     } finally {
@@ -168,6 +167,20 @@ function UsersManagement() {
   const refreshUsersData = () => {
     if (adminCode) {
       fetchUsersData();
+      setIsSearchActive(false); // Reset search state on refresh
+    }
+  };
+
+  // Handle search results from TopBar
+  const handleSearch = (searchResults) => {
+    if (searchResults === null) {
+      // Null indicates to reset to original data (when search is cleared)
+      setFilteredUsersData(usersData);
+      setIsSearchActive(false);
+    } else {
+      // Update with search results
+      setFilteredUsersData(searchResults);
+      setIsSearchActive(true);
     }
   };
 
@@ -178,22 +191,45 @@ function UsersManagement() {
       
       {/* Main Content */}
       <div className="flex-1 p-6">
-        {/* Top Bar */}
-        <TopBar />
+        {/* Top Bar with search capability */}
+        <TopBar onSearch={handleSearch}  searchType="users"/>
         
         {/* Header */}
         <div className="flex justify-between font-DMSansRegular items-center mb-6">
-          <h1 className="text-3xl font-[500]">Users Page</h1>
-          <button 
-            onClick={refreshUsersData}
-            className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md hover:bg-[#2d4a73] transition-colors"
-          >
-            Refresh Data
-          </button>
+          <div>
+            <h1 className="text-3xl font-[500]">Users Page</h1>
+            {isSearchActive && (
+              <p className="text-gray-400 mt-1">
+                Showing {filteredUsersData.length} {filteredUsersData.length === 1 ? 'result' : 'results'}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            {isSearchActive && (
+              <button 
+                onClick={() => {
+                  setFilteredUsersData(usersData);
+                  setIsSearchActive(false);
+                }}
+                className="bg-gray-700 text-white py-2 px-4 rounded-md hover:bg-gray-600 transition-colors"
+              >
+                Clear Search
+              </button>
+            )}
+            <button 
+              onClick={refreshUsersData}
+              className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md hover:bg-[#2d4a73] transition-colors"
+            >
+              Refresh Data
+            </button>
+          </div>
         </div>
         
         {/* Users Table */}
-        <RecentFloorScansTable usersData={usersData} loading={loading} />
+        <RecentFloorScansTable 
+          usersData={filteredUsersData} 
+          loading={loading} 
+        />
       </div>
     </div>
   );
