@@ -134,7 +134,7 @@ function UsersManagement() {
       // Query users with matching adminCode (refralCode in your case)
       const usersQuery = query(
         collection(db, 'users'),
-        where('refralCode', '==', adminCode),
+        where('adminCode', '==', adminCode),
         where('type', '==', 'User')
       );
       

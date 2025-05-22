@@ -1,27 +1,24 @@
 import { useState, useEffect } from "react";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
-import { db } from "../../firebase"; // Import the Firebase setup from your firebase.js file
+import { getStorage, ref as storageRef, getDownloadURL } from 'firebase/storage';
+import { db } from "../../firebase";
 import SideBar from "../SideBar";
 import TopBar from "../TopBar";
-import { Link, useParams } from "react-router-dom"; // Import useParams hook
+import { Link, useParams } from "react-router-dom";
 import React from "react";
 import FilterByCategories from "./FilterByCategories";
+import ModelViewer from "../UserManagement/ModelViewer"; // Import your ModelViewer component
 
 function RoomMeasurementInterface() {
-  // Get project ID from URL params
-  const { projectId } = useParams(); // Extract projectId from URL
+  const { projectId } = useParams();
   
-  // State for project data
   const [userData, setUserData] = useState({
     projectname: "",
     scannedby: "",
     date: "",
   });
   
-  // State for facilities (using other projects as facilities)
   const [facilities, setFacilities] = useState([]);
-  
-  // Loading and error states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -41,7 +38,6 @@ function RoomMeasurementInterface() {
   useEffect(() => {
     const fetchProjectData = async () => {
       try {
-        // Now using the projectId from URL params
         if (!projectId) {
           setError("No project ID provided");
           setLoading(false);
@@ -59,7 +55,6 @@ function RoomMeasurementInterface() {
           const usersRef = collection(db, "users");
           const usersSnapshot = await getDocs(usersRef);
           
-          // Create a map of user UIDs to names for quick lookup
           const userMap = {};
           usersSnapshot.forEach((userDoc) => {
             const userData = userDoc.data();
@@ -68,14 +63,12 @@ function RoomMeasurementInterface() {
             }
           });
           
-          // Get the date
           const date = projectData.creationDate ? 
             new Date(projectData.creationDate.toDate ? projectData.creationDate.toDate() : projectData.creationDate) : 
             new Date();
           
           const formattedDate = formatDate(date);
           
-          // Get the user who scanned/created the project
           const creatorID = projectData.creatorID;
           let scannedBy = "Unknown User";
           
@@ -89,24 +82,33 @@ function RoomMeasurementInterface() {
             date: formattedDate,
           });
           
-          // Since we only want the project from the URL param,
-          // we don't need to fetch additional projects
-          const facilitiesData = [];
-          
-          // The projectData variable already contains the data of the current project
-          // Let's use that directly to create our single facility item
+          // Get 3D model URL if available
+          let modelUrl = null;
+          if (projectData.usdFileUrl) {
+            try {
+              const storage = getStorage();
+              const fileRef = storageRef(storage, projectData.usdFileUrl);
+              modelUrl = await getDownloadURL(fileRef);
+              console.log('Retrieved model URL for floors plan:', modelUrl);
+            } catch (e) {
+              console.error('Could not load model URL:', e);
+            }
+          }
           
           // Count rooms from roomData array if available
           const roomCount = Array.isArray(projectData.roomData) ? projectData.roomData.length : 0;
           
-          // Create a single facility item from the current project
-          facilitiesData.push({
+          // Create facility item with 3D model data
+          const facilitiesData = [{
             id: projectId,
             name: projectData.name || "Unnamed Project",
             description: `${roomCount} Rooms`,
             imageUrl: projectData.imageUrl || null,
-            category: projectData.category || "Unknown"
-          });
+            category: projectData.category || "Unknown",
+            modelUrl: modelUrl,
+            modelFormat: projectData.modelFormat || null,
+            hasModel: !!modelUrl
+          }];
           
           setFacilities(facilitiesData);
         } else {
@@ -121,7 +123,7 @@ function RoomMeasurementInterface() {
     };
 
     fetchProjectData();
-  }, [projectId]); // Add projectId as dependency so effect runs when it changes
+  }, [projectId]);
 
   if (loading) {
     return (
@@ -159,7 +161,7 @@ function RoomMeasurementInterface() {
         </div>
       </div>
 
-      {/* Facility Card - Single Project */}
+      {/* Facility Card - Keep Original Size */}
       <div className="p- grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-4 mt-6">
         {facilities.length > 0 ? (
           facilities.map((facility) => (
@@ -167,25 +169,60 @@ function RoomMeasurementInterface() {
               key={facility.id}
               className="bg-[#202022] rounded-lg overflow-hidden shadow-lg"
             >
-              <div className="p-4 flex flex-row gap-4 ">
+              <div className="p-4 flex flex-row gap-4">
+                {/* 3D Model or Image - Keep Original 150x150 Size */}
                 <div className="w-full md:w-[150px] h-[150px] mb-4 md:mb-0">
-                  <img
-                    src={facility.imageUrl || `/assets/img1.png`}
-                    alt={facility.name}
-                    className="w-full h-full object-cover rounded-xl"
-                  />
+                  {facility.hasModel ? (
+                    <div 
+                      className="w-full h-full bg-black rounded-xl overflow-hidden flex items-center justify-center model-viewer-container"
+                      style={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <div 
+                        className="w-full h-full relative"
+                        style={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <ModelViewer 
+                          modelUrl={facility.modelUrl}
+                          projectData={{
+                            modelFormat: facility.modelFormat,
+                            name: facility.name
+                          }}
+                          onUpdatePreview={() => {}} // No preview update needed for this view
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      src={facility.imageUrl || `/assets/img1.png`}
+                      alt={facility.name}
+                      className="w-full h-full object-cover rounded-xl"
+                    />
+                  )}
                 </div>
+                
+                {/* Project Info - Keep Original Layout */}
                 <div className="flex flex-col gap-2 justify-center font-SFProDisplay">
                   <h3 className="text-white text-xl font-medium">
                     {facility.name}
                   </h3>
                   <p className="text-white">{facility.category}</p>
+                  {facility.hasModel && (
+                    <p className="text-green-400 text-sm">3D Model Available</p>
+                  )}
                   
                   <div className="flex gap-3">
-                     <Link to={`/project-details/${facility.id}`}>
-                    <button className="bg-white text-[#0D0D12] rounded-lg px-4 py-2 text-sm font-medium">
-                      View 
-                    </button>
+                    <Link to={`/project-details/${facility.id}`}>
+                      <button className="bg-white text-[#0D0D12] rounded-lg px-4 py-2 text-sm font-medium">
+                        View 
+                      </button>
                     </Link>
                   </div>
                 </div>
@@ -207,11 +244,8 @@ function ProjectDetails() {
     <>
       <div className="flex min-h-screen h-full bg-black text-white">
         <SideBar />
-        {/* Main Content */}
         <div className="flex-1 p-6">
-          {/* Top Bar */}
           <TopBar />
-          {/* Welcome */}
           <div className="flex justify-between font-DMSansRegular items-center mb-6">
             <h1 className="text-3xl font-[500]">Floors Plan</h1>
           </div>

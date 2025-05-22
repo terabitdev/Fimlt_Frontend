@@ -1,3 +1,5 @@
+
+
 import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -7,9 +9,12 @@ import '@google/model-viewer';
 function ModelViewer({ modelUrl, projectData, onUpdatePreview }) {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingStage, setLoadingStage] = useState('Initializing...');
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
   const [isUSDZ, setIsUSDZ] = useState(false);
-  const [useThreeJS, setUseThreeJS] = useState(false);
+  const [viewerMode, setViewerMode] = useState('detecting');
+  const [containerReady, setContainerReady] = useState(false);
   
   // Refs for Three.js implementation
   const containerRef = useRef(null);
@@ -21,6 +26,95 @@ function ModelViewer({ modelUrl, projectData, onUpdatePreview }) {
   const usdzLoaderRef = useRef(null);
   const usdzInstanceRef = useRef(null);
   const clockRef = useRef(new THREE.Clock());
+
+  // Loading indicator component
+  function LoadingIndicator() {
+    return (
+      <div 
+        className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-90 z-10 cursor-pointer"
+        onClick={() => {
+          console.log('Loading indicator clicked - hiding loader');
+          setIsLoading(false);
+        }}
+        title="Click to hide loading indicator"
+      >
+        <div className="text-center max-w-xs">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-white text-sm font-medium mb-2">
+            {isUSDZ ? 'Loading USDZ Model' : 'Loading 3D Model'}
+          </p>
+          <p className="text-gray-300 text-xs mb-3">
+            {loadingStage}
+          </p>
+          {isUSDZ && loadingProgress > 0 && (
+            <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+              <div 
+                className="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${loadingProgress}%` }}
+              ></div>
+            </div>
+          )}
+          {isUSDZ && (
+            <div>
+              <p className="text-gray-400 text-xs mb-2">
+                Large files may take time to process
+              </p>
+              {loadingProgress >= 95 && (
+                <p className="text-yellow-400 text-xs">
+                  Click anywhere to continue if model is visible
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Error display component
+  function ErrorDisplay() {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#000000] p-4">
+        <div className="text-center max-w-xs">
+          <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-white text-2xl">!</span>
+          </div>
+          <p className="text-white text-sm mb-2">Failed to load 3D model</p>
+          <p className="text-red-400 text-xs text-center mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Simple fallback for USDZ when Three.js fails
+  function SimpleFallback() {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#000000] p-4">
+        <div className="text-center max-w-xs">
+          <div className="w-24 h-24 bg-gray-700 rounded-lg flex items-center justify-center mx-auto mb-4">
+            <span className="text-white text-lg">3D</span>
+          </div>
+          <p className="text-white text-sm mb-2">USDZ Model</p>
+          <p className="text-gray-400 text-xs mb-4">
+            This model is best viewed on iOS devices
+          </p>
+          <a 
+            href={modelUrl} 
+            download 
+            className="inline-block px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+          >
+            Download Model
+          </a>
+        </div>
+      </div>
+    );
+  }
   
   // Detect iOS device
   useEffect(() => {
@@ -32,65 +126,110 @@ function ModelViewer({ modelUrl, projectData, onUpdatePreview }) {
     setIsIOSDevice(checkIsIOS());
   }, []);
   
-  // Detect file type and set up model loading
+  // Check if container is ready
+  useEffect(() => {
+    if (containerRef.current) {
+      console.log('Container is ready:', containerRef.current);
+      setContainerReady(true);
+    }
+  });
+
+  // Determine viewer mode
   useEffect(() => {
     if (!modelUrl) {
       setError('No model URL provided');
+      setViewerMode('error');
       setIsLoading(false);
       return;
     }
     
-    // Reset state when model URL changes
+    // Reset state
     setError(null);
     setIsLoading(true);
+    setLoadingStage('Detecting file type...');
+    setLoadingProgress(0);
+    setContainerReady(false);
     
     // Check if it's a USDZ file
     const isUSDZFile = modelUrl.toLowerCase().includes('.usdz') || 
                        projectData?.modelFormat === 'model/vnd.usdz+zip';
     setIsUSDZ(isUSDZFile);
     
-    // If it's a USDZ file and not on iOS, use Three.js
-    if (isUSDZFile && !isIOSDevice) {
-      console.log('USDZ file on non-iOS device - using Three.js viewer');
-      setUseThreeJS(true);
-      initializeUSDZLoader();
+    // Determine which viewer to use
+    if (isUSDZFile) {
+      if (isIOSDevice) {
+        console.log('USDZ file on iOS device - using model-viewer');
+        setViewerMode('modelviewer');
+        setIsLoading(false);
+      } else {
+        console.log('USDZ file on non-iOS device - will use Three.js when container is ready');
+        setViewerMode('threejs');
+      }
     } else {
-      setUseThreeJS(false);
+      console.log('Non-USDZ file - using model-viewer');
+      setViewerMode('modelviewer');
       setIsLoading(false);
     }
   }, [modelUrl, isIOSDevice, projectData?.modelFormat]);
 
-  // Initialize USDZ loader and Three.js scene
-  const initializeUSDZLoader = async () => {
-    try {
-      // Initialize USDZ loader
-      const loader = new USDZLoader('/wasm'); // Point to your public/wasm directory
-      usdzLoaderRef.current = loader;
+  // Initialize USDZ when container is ready
+  useEffect(() => {
+    if (viewerMode === 'threejs' && containerReady && isUSDZ && !usdzLoaderRef.current) {
+      console.log('Container ready, initializing USDZ loader...');
+      setLoadingStage('Initializing USDZ loader...');
       
-      // Wait for WASM module to be ready
-      await loader.waitForModuleLoadingCompleted();
+      const initUSDZ = async () => {
+        try {
+          console.log('Starting USDZ initialization...');
+          setLoadingStage('Loading WASM modules...');
+          
+          const loader = new USDZLoader('/wasm');
+          usdzLoaderRef.current = loader;
+          
+          console.log('Waiting for USDZ module...');
+          const module = await loader.waitForModuleLoadingCompleted();
+          
+          if (!module) {
+            throw new Error('WASM module failed to load. Check if files exist in /public/wasm/');
+          }
+          
+          console.log('USDZ module ready, initializing scene...');
+          await initThreeJSScene();
+          
+        } catch (err) {
+          console.error('USDZ initialization failed:', err);
+          setError(`USDZ Error: ${err.message}`);
+          setViewerMode('fallback');
+          setIsLoading(false);
+        }
+      };
       
-      if (!usdzLoaderRef.current) {
-        throw new Error('USDZ loader failed to initialize');
-      }
+      // Add a safety timeout to hide loading if something goes wrong
+      const safetyTimeout = setTimeout(() => {
+        if (isLoading) {
+          console.warn('Safety timeout reached - hiding loader');
+          setIsLoading(false);
+        }
+      }, 30000); // 30 second safety timeout
       
-      // Initialize Three.js scene
-      initThreeJSScene();
-      
-    } catch (err) {
-      console.error("Failed to initialize USDZ loader:", err);
-      setError(`Failed to initialize USDZ loader: ${err.message}`);
-      setIsLoading(false);
+      initUSDZ().finally(() => {
+        clearTimeout(safetyTimeout);
+      });
     }
-  };
+  }, [viewerMode, containerReady, isUSDZ]);
 
-  // Initialize Three.js scene for USDZ files
-  const initThreeJSScene = () => {
-    if (!containerRef.current || !usdzLoaderRef.current) return;
+  // Initialize Three.js scene
+  const initThreeJSScene = async () => {
+    if (!containerRef.current) {
+      throw new Error('Container not available for scene initialization');
+    }
     
     try {
-      // Clean up any existing scene
+      console.log('Initializing Three.js scene...');
       cleanupThreeJSScene();
+      
+      const width = containerRef.current.clientWidth || 400;
+      const height = containerRef.current.clientHeight || 300;
       
       // Create scene
       const scene = new THREE.Scene();
@@ -98,178 +237,176 @@ function ModelViewer({ modelUrl, projectData, onUpdatePreview }) {
       sceneRef.current = scene;
 
       // Create camera
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        containerRef.current.clientWidth / containerRef.current.clientHeight,
-        0.1,
-        1000
-      );
+      const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
       camera.position.z = 5;
       cameraRef.current = camera;
 
       // Create renderer
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
+      const renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        preserveDrawingBuffer: true
+      });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
+      
       containerRef.current.appendChild(renderer.domElement);
       rendererRef.current = renderer;
 
-      // Add controls
+      // Create controls
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.dampingFactor = 0.05;
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 0.5;
       controlsRef.current = controls;
 
-      // Add lights
+      // Add lighting
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
       scene.add(ambientLight);
 
       const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
       directionalLight.position.set(5, 5, 5);
       directionalLight.castShadow = true;
-      directionalLight.shadow.mapSize.width = 2048;
-      directionalLight.shadow.mapSize.height = 2048;
       scene.add(directionalLight);
 
-      // Start animation loop
-      animate();
-
-      // Load the model
-      loadModelWithThreeJS();
+      // Start animation
+      startAnimation();
       
-      // Handle window resize
-      const handleResize = () => {
-        if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
-        
-        const width = containerRef.current.clientWidth;
-        const height = containerRef.current.clientHeight;
-        
-        cameraRef.current.aspect = width / height;
-        cameraRef.current.updateProjectionMatrix();
-        rendererRef.current.setSize(width, height);
-      };
-
-      window.addEventListener('resize', handleResize);
+      // Load model
+      await loadUSDZModel();
       
     } catch (err) {
-      console.error("Failed to initialize Three.js scene:", err);
-      setError(`Failed to initialize 3D viewer: ${err.message}`);
-      setIsLoading(false);
+      console.error('Scene initialization failed:', err);
+      throw err;
     }
   };
 
-  // Load the USDZ model using Three.js
-  const loadModelWithThreeJS = async () => {
-    if (!usdzLoaderRef.current || !sceneRef.current) {
-      setError("3D viewer not initialized properly");
-      setIsLoading(false);
-      return;
-    }
-
+  // Load USDZ model
+  const loadUSDZModel = async () => {
     try {
-      console.log('Loading USDZ model from URL:', modelUrl);
+      setLoadingStage('Downloading USDZ file...');
+      setLoadingProgress(10);
       
-      // Fetch the model file
-      const response = await fetch(modelUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/octet-stream, */*',
-        },
-      });
-      
+      const response = await fetch(modelUrl);
       if (!response.ok) {
-        throw new Error(`Failed to fetch model: ${response.status} ${response.statusText}`);
+        throw new Error(`Download failed: ${response.statusText}`);
       }
       
+      setLoadingProgress(40);
       const blob = await response.blob();
-      console.log('Downloaded blob size:', blob.size, 'bytes');
+      const file = new File([blob], "model.usdz", { type: "application/octet-stream" });
       
-      if (blob.size === 0) {
-        throw new Error('Downloaded file is empty');
-      }
+      setLoadingStage('Loading 3D model...');
+      setLoadingProgress(70);
       
-      // Extract filename from URL or use default
-      let fileName = "model.usdz";
-      try {
-        const url = new URL(modelUrl);
-        const pathSegments = url.pathname.split('/');
-        const lastSegment = pathSegments[pathSegments.length - 1];
-        if (lastSegment && lastSegment.includes('.usdz')) {
-          fileName = decodeURIComponent(lastSegment.split('?')[0]);
-        }
-      } catch (e) {
-        console.warn('Could not extract filename from URL, using default');
-      }
-      
-      const file = new File([blob], fileName, { type: "application/octet-stream" });
-      
-      // Create a group to hold the model
       const modelGroup = new THREE.Group();
       sceneRef.current.add(modelGroup);
       
-      // Load the USDZ file
-      console.log('Loading USDZ file with loader...');
       const usdzInstance = await usdzLoaderRef.current.loadFile(file, modelGroup);
       usdzInstanceRef.current = usdzInstance;
       
-      console.log('USDZ model loaded successfully');
+      setLoadingProgress(90);
+      setLoadingStage('Positioning camera...');
       
-      // Auto-center and adjust camera to fit the model
+      // Position camera
       const box = new THREE.Box3().setFromObject(modelGroup);
       if (!box.isEmpty()) {
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         
-        // Center the model
         modelGroup.position.sub(center);
         
-        // Adjust camera
         const maxDim = Math.max(size.x, size.y, size.z);
         if (maxDim > 0) {
           const fov = cameraRef.current.fov * (Math.PI / 180);
           let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
-          
-          // Add some padding
           cameraDistance *= 1.5;
           
           cameraRef.current.position.z = cameraDistance;
-          if (controlsRef.current) {
-            controlsRef.current.target.set(0, 0, 0);
-            controlsRef.current.update();
-          }
+          controlsRef.current.target.set(0, 0, 0);
+          controlsRef.current.update();
         }
       }
       
-      // Generate preview if callback provided
+      setLoadingStage('Rendering model...');
+      setLoadingProgress(95);
+      
+      // Wait for model to be properly rendered
+      await waitForModelRender(modelGroup);
+      
+      setLoadingProgress(100);
+      
+      // Generate preview
       if (onUpdatePreview && rendererRef.current) {
         setTimeout(() => {
           try {
             const canvas = rendererRef.current.domElement;
-            const previewUrl = canvas.toDataURL('image/png');
+            const previewUrl = canvas.toDataURL('image/png', 0.8);
             onUpdatePreview(previewUrl);
+            console.log('Preview generated successfully');
           } catch (err) {
-            console.warn('Could not generate preview:', err);
+            console.warn('Preview generation failed:', err);
           }
-        }, 1000); // Wait for model to render
+        }, 500);
       }
       
-      setIsLoading(false);
+      // Hide loading with a smooth transition
+      setTimeout(() => {
+        setIsLoading(false);
+        console.log('USDZ model fully loaded and rendered');
+      }, 800);
       
     } catch (err) {
-      console.error("Failed to load USDZ file:", err);
-      setError(`Failed to load 3D model: ${err.message}`);
-      setIsLoading(false);
+      console.error('Model loading failed:', err);
+      throw err;
     }
+  };
+
+  // Wait for model to render properly
+  const waitForModelRender = (modelGroup) => {
+    return new Promise((resolve) => {
+      let renderAttempts = 0;
+      const maxRenderAttempts = 30; // 3 seconds max
+      
+      const checkRender = () => {
+        renderAttempts++;
+        
+        // Force a render
+        if (rendererRef.current && sceneRef.current && cameraRef.current) {
+          rendererRef.current.render(sceneRef.current, cameraRef.current);
+        }
+        
+        // Check if model has visible content
+        const hasVisibleMeshes = modelGroup.children.some(child => {
+          return child.geometry && 
+                 child.geometry.attributes.position && 
+                 child.geometry.attributes.position.count > 0;
+        });
+        
+        if (hasVisibleMeshes) {
+          console.log(`Model render confirmed after ${renderAttempts} attempts`);
+          // Give it a bit more time to ensure everything is rendered
+          setTimeout(resolve, 300);
+        } else if (renderAttempts >= maxRenderAttempts) {
+          console.log('Model render timeout - proceeding anyway');
+          resolve();
+        } else {
+          setTimeout(checkRender, 100);
+        }
+      };
+      
+      // Start checking after a short delay
+      setTimeout(checkRender, 200);
+    });
   };
 
   // Animation loop
   const animate = () => {
     animationFrameRef.current = requestAnimationFrame(animate);
     
-    // Update animations if the model has them
     if (usdzInstanceRef.current) {
       const elapsedTime = clockRef.current.getElapsedTime();
       usdzInstanceRef.current.update(elapsedTime);
@@ -284,22 +421,25 @@ function ModelViewer({ modelUrl, projectData, onUpdatePreview }) {
     }
   };
 
-  // Clean up Three.js resources
+  const startAnimation = () => {
+    if (!animationFrameRef.current) {
+      animate();
+    }
+  };
+
+  // Cleanup
   const cleanupThreeJSScene = () => {
-    // Stop animation loop
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
     
-    // Clean up USDZ instance
     if (usdzInstanceRef.current) {
       usdzInstanceRef.current.clear();
       usdzInstanceRef.current = null;
     }
     
-    // Remove renderer from DOM
-    if (rendererRef.current && rendererRef.current.domElement && containerRef.current) {
+    if (rendererRef.current && containerRef.current) {
       try {
         containerRef.current.removeChild(rendererRef.current.domElement);
       } catch (e) {
@@ -309,7 +449,6 @@ function ModelViewer({ modelUrl, projectData, onUpdatePreview }) {
       rendererRef.current = null;
     }
     
-    // Dispose of scene resources
     if (sceneRef.current) {
       sceneRef.current.traverse((object) => {
         if (object.geometry) object.geometry.dispose();
@@ -321,137 +460,78 @@ function ModelViewer({ modelUrl, projectData, onUpdatePreview }) {
           }
         }
       });
-      
       sceneRef.current.clear();
       sceneRef.current = null;
     }
-    
-    // Remove event listeners
-    window.removeEventListener('resize', () => {});
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       cleanupThreeJSScene();
     };
   }, []);
 
-  // Handle errors from the model-viewer
+  // Model-viewer handlers
   const handleModelViewerError = (event) => {
     console.error('Model-viewer error:', event.detail);
-    setError(`Failed to load model: ${event.detail.type || 'Unknown error'}`);
+    setError(`Model viewer error: ${event.detail.type || 'Unknown error'}`);
     setIsLoading(false);
   };
 
-  // Handle when model is loaded successfully
   const handleModelLoad = () => {
-    console.log('Model loaded successfully');
+    console.log('Model loaded with model-viewer');
     setIsLoading(false);
-    
-    // Generate preview for model-viewer if callback provided
-    if (onUpdatePreview) {
-      // For model-viewer, we can try to get a screenshot
-      setTimeout(() => {
-        try {
-          const modelViewer = containerRef.current?.querySelector('model-viewer');
-          if (modelViewer && modelViewer.toDataURL) {
-            const previewUrl = modelViewer.toDataURL('image/png');
-            onUpdatePreview(previewUrl);
-          }
-        } catch (err) {
-          console.warn('Could not generate preview from model-viewer:', err);
-        }
-      }, 2000);
-    }
   };
 
-  // Loading indicator
-  const LoadingIndicator = () => (
-    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 z-10">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-        <p className="text-white text-sm">
-          {isUSDZ ? 'Loading USDZ model...' : 'Loading 3D model...'}
-        </p>
-      </div>
-    </div>
-  );
-
-  // Error display
-  const ErrorDisplay = () => (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-[#000000] p-4">
-      <p className="text-white text-sm mb-2">Failed to load 3D model</p>
-      <p className="text-red-400 text-xs text-center mb-4">{error}</p>
-      <button 
-        onClick={() => window.location.reload()} 
-        className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-      >
-        Retry
-      </button>
-    </div>
-  );
-
-  // Simple USDZ fallback viewer (used when three.js initialization fails)
-  const SimpleUSDZViewer = () => (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-[#000000] p-4">
-      <p className="text-white text-sm mb-4">USDZ Model</p>
-      <div className="w-24 h-24 bg-gray-700 rounded-lg flex items-center justify-center mb-4">
-        <span className="text-white text-xs">3D</span>
-      </div>
-      <p className="text-white text-xs text-center">
-        USDZ files are best viewed on iOS devices.
-        <br />
-        <a 
-          href={modelUrl} 
-          download 
-          className="text-blue-400 hover:underline mt-2 inline-block"
-        >
-          Download model
-        </a>
-      </p>
-    </div>
-  );
-
-  // Determine what to render
-  if (error) {
+  // Render logic
+  if (viewerMode === 'error' || error) {
     return <ErrorDisplay />;
   }
   
-  // For USDZ files on non-iOS that need Three.js rendering
-  if (isUSDZ && !isIOSDevice && useThreeJS) {
+  if (viewerMode === 'fallback') {
+    return <SimpleFallback />;
+  }
+  
+  if (viewerMode === 'threejs') {
     return (
-      <div className="relative w-full h-full" ref={containerRef}>
+      <div 
+        className="relative w-full h-full bg-black" 
+        ref={containerRef}
+        style={{ minWidth: '300px', minHeight: '200px' }}
+      >
         {isLoading && <LoadingIndicator />}
       </div>
     );
   }
   
-  // For USDZ files on non-iOS where Three.js failed to initialize
-  if (isUSDZ && !isIOSDevice && !useThreeJS) {
-    return <SimpleUSDZViewer />;
+  if (viewerMode === 'modelviewer') {
+    return (
+      <div className="relative w-full h-full" ref={containerRef}>
+        <model-viewer
+          src={isUSDZ ? undefined : modelUrl}
+          ios-src={isUSDZ ? modelUrl : undefined}
+          alt="3D Model"
+          camera-controls
+          auto-rotate
+          shadow-intensity="1"
+          loading="eager"
+          style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: '#000000'
+          }}
+          onLoad={handleModelLoad}
+          onError={isUSDZ ? undefined : handleModelViewerError}
+        ></model-viewer>
+        
+        {isLoading && <LoadingIndicator />}
+      </div>
+    );
   }
   
-  // Otherwise use model-viewer with appropriate settings
   return (
-    <div className="relative w-full h-full" ref={containerRef}>
-      <model-viewer
-        src={isUSDZ ? "" : modelUrl}   // For USDZ, leave src empty
-        ios-src={isUSDZ ? modelUrl : ""} // Only set ios-src for USDZ files
-        alt="3D Model"
-        camera-controls
-        auto-rotate
-        shadow-intensity="1"
-        style={{
-          width: '100%',
-          height: '100%',
-          backgroundColor: '#000000'
-        }}
-        onLoad={handleModelLoad}
-        onError={handleModelViewerError}
-      ></model-viewer>
-      
-      {isLoading && <LoadingIndicator />}
+    <div className="relative w-full h-full bg-black">
+      <LoadingIndicator />
     </div>
   );
 }
