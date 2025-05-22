@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Eye } from 'lucide-react';
 import SideBar from '../Components/SideBar';
@@ -6,6 +7,15 @@ import { Link } from 'react-router-dom';
 import { auth, db } from '../firebase'; 
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+
+// Loading Spinner Component - matching FloorsPlan style
+const LoadingSpinner = () => {
+  return (
+    <div className="flex justify-center items-center h-48">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1E3A5F]"></div>
+    </div>
+  );
+};
 
 const RecentFloorScansTable = ({ usersData, loading }) => {
   return (
@@ -38,8 +48,8 @@ const RecentFloorScansTable = ({ usersData, loading }) => {
           <tbody className="bg-white font-PublicSansMedium">
             {loading ? (
               <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
-                  Loading users...
+                <td colSpan="5" className="p-0">
+                  <LoadingSpinner />
                 </td>
               </tr>
             ) : usersData.length === 0 ? (
@@ -218,9 +228,17 @@ function UsersManagement() {
             )}
             <button 
               onClick={refreshUsersData}
-              className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md hover:bg-[#2d4a73] transition-colors"
+              className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md hover:bg-[#2d4a73] transition-colors flex items-center gap-2"
+              disabled={loading}
             >
-              Refresh Data
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Loading...
+                </>
+              ) : (
+                'Refresh Data'
+              )}
             </button>
           </div>
         </div>

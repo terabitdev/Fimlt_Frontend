@@ -1177,19 +1177,19 @@ function TopBar({ onSearch, searchType = 'users' }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div 
             ref={modalRef}
-            className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4"
+            className="bg-[#1E3A5F] rounded-lg shadow-xl max-w-md w-full mx-4"
           >
             <div className="p-5 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-xl font-semibold text-gray-800">Edit Profile</h3>
+              <h3 className="text-xl font-semibold text-white">Edit Profile</h3>
               <button
                 onClick={closeEditModal}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-white hover:text-gray-400 text-2xl"
               >
                 &times;
               </button>
             </div>
             
-            <form onSubmit={handleEditSubmit} className="p-5">
+            <form onSubmit={handleEditSubmit} className="p-5 ">
               {editError && (
                 <div className="mb-4 text-red-500 bg-red-100 p-3 rounded-md">
                   {editError}
@@ -1205,7 +1205,7 @@ function TopBar({ onSearch, searchType = 'users' }) {
               <div className="mb-4">
                 <label 
                   htmlFor="name" 
-                  className="block text-gray-700 font-medium mb-2"
+                  className="block text-white font-medium mb-2"
                 >
                   Name
                 </label>
@@ -1215,7 +1215,7 @@ function TopBar({ onSearch, searchType = 'users' }) {
                   name="name"
                   value={editData.name}
                   onChange={handleEditChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-white shadow-lg rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
@@ -1223,7 +1223,7 @@ function TopBar({ onSearch, searchType = 'users' }) {
               <div className="mb-4">
                 <label 
                   htmlFor="email" 
-                  className="block text-gray-700 font-medium mb-2"
+                  className="block text-white font-medium mb-2"
                 >
                   Email
                 </label>
@@ -1233,7 +1233,7 @@ function TopBar({ onSearch, searchType = 'users' }) {
                   name="email"
                   value={editData.email}
                   onChange={handleEditChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-white shadow-lg rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
@@ -1242,13 +1242,13 @@ function TopBar({ onSearch, searchType = 'users' }) {
                 <button
                   type="button"
                   onClick={closeEditModal}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 mr-2"
+                  className="px-4 py-2  text-white rounded-md border border-white bg-[#FB0000] mr-2"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#1E3A5F] text-white rounded-md hover:bg-[#2d4a73] flex items-center"
+                  className="px-4 py-2  text-white rounded-md border border-white flex items-center"
                   disabled={isEditLoading}
                 >
                   {isEditLoading ? (
