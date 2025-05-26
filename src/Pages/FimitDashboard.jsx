@@ -1,3 +1,5 @@
+
+
 import { useState, useEffect } from "react";
 import SideBar from "../Components/SideBar";
 import TopBar from "../Components/TopBar";
@@ -18,44 +20,29 @@ import {
   Plus,
   ChevronDown,
 } from "lucide-react";
-import { auth, db } from "../firebase"; // Adjust the path based on your file structure
+import { auth, db } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   query,
   where,
-  getDocs,
+  onSnapshot, // Import onSnapshot for real-time updates
   doc,
   getDoc,
 } from "firebase/firestore";
 
 export default function FimitDashboard() {
   const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
   ];
 
-  // Set current month as default
   const getCurrentMonth = () => months[new Date().getMonth()];
 
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showMonthDropdown, setShowMonthDropdown] = useState(false);
-
-  // Add current user state
   const [currentUser, setCurrentUser] = useState(null);
-
-  // Dashboard data states
   const [adminData, setAdminData] = useState({
     name: "",
     adminCode: "",
@@ -68,29 +55,25 @@ export default function FimitDashboard() {
   const [monthlyUserData, setMonthlyUserData] = useState({});
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPointIndex, setSelectedPointIndex] = useState(2); // Default to center (0-based index, middle of 6 points)
+  const [selectedPointIndex, setSelectedPointIndex] = useState(2);
 
-  // Fetch admin data and stats on component mount
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setCurrentUser(user); // Store the current user
-        await fetchAdminData(user.uid);
-        await fetchDashboardStats(user.uid);
-      } else {
-        setCurrentUser(null);
+  // Store unsubscribe functions for cleanup
+  const [unsubscribeFunctions, setUnsubscribeFunctions] = useState([]);
+
+  // Helper function to clean up listeners
+  const cleanupListeners = (listeners) => {
+    listeners.forEach(listener => {
+      if (typeof listener === 'function') {
+        // Old format - direct function
+        listener();
+      } else if (listener && typeof listener.unsubscribe === 'function') {
+        // New format - wrapper object
+        listener.unsubscribe();
       }
     });
+  };
 
-    return () => unsubscribe();
-  }, []);
-
-  // Update chart data when selected month changes
-  useEffect(() => {
-    updateChartData();
-  }, [selectedMonth, monthlyUserData]);
-
-  // Fetch admin data from Firestore
+  // Fetch admin data (one-time fetch as this rarely changes)
   const fetchAdminData = async (uid) => {
     try {
       const userDoc = await getDoc(doc(db, "users", uid));
@@ -100,151 +83,209 @@ export default function FimitDashboard() {
           name: data.name || "Admin",
           adminCode: data.adminCode || "",
         });
+        
+        // After getting admin data, set up real-time listeners
+        setupRealtimeListeners(uid, data.adminCode);
       }
     } catch (error) {
       console.error("Error fetching admin data:", error);
     }
   };
 
-  // Clean version of fetchDashboardStats function
-  const fetchDashboardStats = async (uid) => {
+  // Setup real-time listeners for users and projects
+  const setupRealtimeListeners = (uid, adminCode) => {
+    const unsubscribes = [];
+
     try {
       setLoading(true);
 
-      // Get admin's data first to get adminCode
-      const adminDoc = await getDoc(doc(db, "users", uid));
-      if (!adminDoc.exists()) return;
-
-      const adminCode = adminDoc.data().adminCode;
-
-      // Fetch users associated with this admin
+      // Real-time listener for users
       const usersQuery = query(
         collection(db, "users"),
         where("adminCode", "==", adminCode),
         where("type", "==", "User")
       );
-      const usersSnapshot = await getDocs(usersQuery);
-      const totalUsers = usersSnapshot.size;
 
-      // Get user IDs for floor scan queries
-      const userIds = [];
-      const monthlyUsers = {};
+      const unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
+        const totalUsers = snapshot.size;
+        const monthlyUsers = {};
+        const userIds = [];
 
-      usersSnapshot.forEach((doc) => {
-        userIds.push(doc.id);
-
-        // Track users by month for the chart
-        const userData = doc.data();
-        if (userData.creationDate) {
-          // Correctly handle Firebase timestamp
-          let creationDate;
-
-          // Check if it's a Firebase timestamp (has toDate method)
-          if (userData.creationDate.toDate) {
-            creationDate = userData.creationDate.toDate();
-          } else {
-            // Fallback to parsing string date if not a timestamp
-            creationDate = new Date(userData.creationDate);
-          }
-
-          const monthYear = `${creationDate.getFullYear()}-${(
-            creationDate.getMonth() + 1
-          )
-            .toString()
-            .padStart(2, "0")}`;
-          monthlyUsers[monthYear] = (monthlyUsers[monthYear] || 0) + 1;
-        }
-      });
-
-      setMonthlyUserData(monthlyUsers);
-
-      // Fetch floor scans for all associated users
-      let totalScans = 0;
-      let weeklyScans = 0;
-
-      // Calculate start of current week (Monday)
-      const now = new Date();
-      const startOfWeek = new Date(now);
-      const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days to Monday
-      startOfWeek.setDate(now.getDate() - daysFromMonday);
-      startOfWeek.setHours(0, 0, 0, 0); // Start of the day
-
-      // Query floor scans for all associated users
-      if (userIds.length > 0) {
-        // Process in batches since Firestore 'in' query limit is 10
-        const batchSize = 10;
-
-        for (let i = 0; i < userIds.length; i += batchSize) {
-          const batch = userIds.slice(i, i + batchSize);
-
-          const scansQuery = query(
-            collection(db, "projects"),
-            where("creatorID", "in", batch)
-          );
-
-          const scansSnapshot = await getDocs(scansQuery);
-
-          scansSnapshot.forEach((docSnap) => {
-            totalScans++;
-            const scanData = docSnap.data();
-
-            // Handle different possible timestamp field names
-            let scanTimestamp = scanData.creationDate;
-
-            if (scanTimestamp) {
-              let scanDate;
-
-              if (scanTimestamp.toDate) {
-                scanDate = scanTimestamp.toDate();
-              } else if (scanTimestamp.seconds) {
-                scanDate = new Date(scanTimestamp.seconds * 1000);
-              } else {
-                scanDate = new Date(scanTimestamp);
-              }
-
-              // Check if scan is from this week
-              if (scanDate >= startOfWeek) {
-                weeklyScans++;
-              }
+        snapshot.forEach((doc) => {
+          userIds.push(doc.id);
+          
+          const userData = doc.data();
+          if (userData.creationDate) {
+            let creationDate;
+            
+            if (userData.creationDate.toDate) {
+              creationDate = userData.creationDate.toDate();
+            } else {
+              creationDate = new Date(userData.creationDate);
             }
-          });
-        }
-      }
 
-      setStats({
-        totalUsers,
-        totalFloorsScanned: totalScans,
-        scansThisWeek: weeklyScans,
+            const monthYear = `${creationDate.getFullYear()}-${(
+              creationDate.getMonth() + 1
+            ).toString().padStart(2, "0")}`;
+            monthlyUsers[monthYear] = (monthlyUsers[monthYear] || 0) + 1;
+          }
+        });
+
+        setMonthlyUserData(monthlyUsers);
+        
+        // Update stats with new user count
+        setStats(prevStats => ({
+          ...prevStats,
+          totalUsers
+        }));
+
+        // Setup projects listener with current user IDs
+        if (userIds.length > 0) {
+          setupProjectsListener(userIds);
+        } else {
+          // If no users, reset project stats
+          setStats(prevStats => ({
+            ...prevStats,
+            totalFloorsScanned: 0,
+            scansThisWeek: 0
+          }));
+          setLoading(false);
+        }
       });
+
+      // ✅ FIXED: Use wrapper object for consistency
+      const wrappedUsersUnsubscribe = {
+        unsubscribe: unsubscribeUsers,
+        listenerType: 'users'
+      };
+      
+      unsubscribes.push(wrappedUsersUnsubscribe);
+      setUnsubscribeFunctions(unsubscribes);
+
     } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-    } finally {
+      console.error("Error setting up real-time listeners:", error);
       setLoading(false);
     }
   };
 
-  // Clean useEffect for auth state changes
+  // Setup real-time listener for projects
+  const setupProjectsListener = (userIds) => {
+    // Clean up existing project listeners
+    const existingUnsubscribes = unsubscribeFunctions.filter(listener => {
+      if (typeof listener === 'function') {
+        return true; // Keep old format functions that aren't projects
+      }
+      return listener.listenerType !== 'projects'; // Filter out project listeners
+    });
+    
+    // Process userIds in batches (Firestore 'in' query limit is 10)
+    const batchSize = 10;
+    const projectUnsubscribes = [];
+
+    for (let i = 0; i < userIds.length; i += batchSize) {
+      const batch = userIds.slice(i, i + batchSize);
+      
+      const projectsQuery = query(
+        collection(db, "projects"),
+        where("creatorID", "in", batch)
+      );
+
+      const unsubscribeProjects = onSnapshot(projectsQuery, (snapshot) => {
+        // Calculate total scans and weekly scans
+        let totalScans = 0;
+        let weeklyScans = 0;
+
+        // Calculate start of current week (Monday)
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        const dayOfWeek = now.getDay();
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        startOfWeek.setDate(now.getDate() - daysFromMonday);
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        snapshot.forEach((docSnap) => {
+          totalScans++;
+          const scanData = docSnap.data();
+          
+          let scanTimestamp = scanData.creationDate;
+          if (scanTimestamp) {
+            let scanDate;
+            
+            if (scanTimestamp.toDate) {
+              scanDate = scanTimestamp.toDate();
+            } else if (scanTimestamp.seconds) {
+              scanDate = new Date(scanTimestamp.seconds * 1000);
+            } else {
+              scanDate = new Date(scanTimestamp);
+            }
+
+            if (scanDate >= startOfWeek) {
+              weeklyScans++;
+            }
+          }
+        });
+
+        // Update stats with scan data
+        setStats(prevStats => ({
+          ...prevStats,
+          totalFloorsScanned: totalScans,
+          scansThisWeek: weeklyScans
+        }));
+
+        setLoading(false);
+      });
+
+      // ✅ FIXED: Use a wrapper object instead of modifying function.name
+      const wrappedUnsubscribe = {
+        unsubscribe: unsubscribeProjects,
+        listenerType: 'projects'
+      };
+      
+      projectUnsubscribes.push(wrappedUnsubscribe);
+    }
+
+    // Update unsubscribe functions
+    setUnsubscribeFunctions([...existingUnsubscribes, ...projectUnsubscribes]);
+  };
+
+  // Auth state change effect
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUser(user);
         await fetchAdminData(user.uid);
-        await fetchDashboardStats(user.uid);
       } else {
         setCurrentUser(null);
+        // Clean up listeners when user logs out
+        cleanupListeners(unsubscribeFunctions);
+        setUnsubscribeFunctions([]);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      // Clean up all listeners on unmount
+      cleanupListeners(unsubscribeFunctions);
+    };
   }, []);
+
+  // Clean up listeners when component unmounts
+  useEffect(() => {
+    return () => {
+      cleanupListeners(unsubscribeFunctions);
+    };
+  }, [unsubscribeFunctions]);
+
+  // Update chart data when selected month changes
+  useEffect(() => {
+    updateChartData();
+  }, [selectedMonth, monthlyUserData]);
 
   // Update chart data with selected month in center
   const updateChartData = () => {
     const currentYear = new Date().getFullYear();
     const selectedMonthIndex = months.indexOf(selectedMonth);
 
-    // Generate chart data with selected month in center (2 months before, selected month, 3 months after)
     const newChartData = [];
 
     // Add 2 months before selected month
@@ -252,16 +293,13 @@ export default function FimitDashboard() {
       let monthIndex = selectedMonthIndex - i;
       let year = currentYear;
 
-      // Handle year wraparound
       if (monthIndex < 0) {
         monthIndex += 12;
         year -= 1;
       }
 
       const monthName = months[monthIndex].slice(0, 3);
-      const monthYear = `${year}-${(monthIndex + 1)
-        .toString()
-        .padStart(2, "0")}`;
+      const monthYear = `${year}-${(monthIndex + 1).toString().padStart(2, "0")}`;
       const value = monthlyUserData[monthYear] || 0;
 
       newChartData.push({
@@ -275,9 +313,7 @@ export default function FimitDashboard() {
     }
 
     // Add selected month in the center
-    const selectedMonthYear = `${currentYear}-${(selectedMonthIndex + 1)
-      .toString()
-      .padStart(2, "0")}`;
+    const selectedMonthYear = `${currentYear}-${(selectedMonthIndex + 1).toString().padStart(2, "0")}`;
     const selectedMonthValue = monthlyUserData[selectedMonthYear] || 0;
 
     newChartData.push({
@@ -294,15 +330,12 @@ export default function FimitDashboard() {
       let monthIndex = (selectedMonthIndex + i) % 12;
       let year = currentYear;
 
-      // Handle year wraparound
       if (monthIndex < selectedMonthIndex) {
         year += 1;
       }
 
       const monthName = months[monthIndex].slice(0, 3);
-      const monthYear = `${year}-${(monthIndex + 1)
-        .toString()
-        .padStart(2, "0")}`;
+      const monthYear = `${year}-${(monthIndex + 1).toString().padStart(2, "0")}`;
       const value = monthlyUserData[monthYear] || 0;
 
       newChartData.push({
@@ -321,16 +354,14 @@ export default function FimitDashboard() {
       data.percentage = (data.value / maxValue) * 100;
     });
 
-    // Set the selected point index to the center point (2)
     setSelectedPointIndex(2);
     setChartData(newChartData);
   };
 
-  // Calculate growth percentage based on selected month compared to previous month
+  // Calculate growth percentage
   const getGrowthPercentage = () => {
-    if (chartData.length < 3) return 0; // Need at least selected month and one before
+    if (chartData.length < 3) return 0;
 
-    // Find the selected month (should be at index 2)
     const selectedIndex = chartData.findIndex((data) => data.isSelected);
     if (selectedIndex < 0 || selectedIndex === 0) return 0;
 
@@ -341,20 +372,18 @@ export default function FimitDashboard() {
     return Math.round(((currentMonth - previousMonth) / previousMonth) * 100);
   };
 
-  // Handle month selection from dropdown
+  // Handle month selection
   const handleMonthSelection = (month) => {
     setSelectedMonth(month);
     setShowMonthDropdown(false);
   };
 
-  // Open and close modal handlers
+  // Modal handlers
   const openCategoriesModal = () => {
-    console.log("Opening categories modal..."); // Debug log
     setIsModalOpen(true);
   };
 
   const closeCategoriesModal = () => {
-    console.log("Closing categories modal..."); // Debug log
     setIsModalOpen(false);
   };
 
@@ -430,9 +459,8 @@ export default function FimitDashboard() {
           </div>
         </div>
 
-        {/* Graph Card - Redesigned */}
+        {/* Graph Card */}
         <div className="bg-white p-6 rounded-lg font-DMSansRegular shadow-sm">
-          {/* Header */}
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-2xl font-semibold text-gray-900">New Users</h2>
             <div className="flex items-center gap-2">
@@ -469,14 +497,12 @@ export default function FimitDashboard() {
             </div>
           </div>
 
-          {/* Growth Percentage */}
           <div className="mb-6">
             <span className="text-lg text-gray-900 font-semibold">
               {getGrowthPercentage()}% Growth
             </span>
           </div>
 
-          {/* Chart Container */}
           <div className="h-80 w-full">
             {loading ? (
               <div className="flex items-center justify-center h-full">
@@ -489,19 +515,9 @@ export default function FimitDashboard() {
                   margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
                 >
                   <defs>
-                    <linearGradient
-                      id="areaGradient"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
+                    <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#1E3A5F" stopOpacity={0.3} />
-                      <stop
-                        offset="100%"
-                        stopColor="#1E3A5F"
-                        stopOpacity={0.05}
-                      />
+                      <stop offset="100%" stopColor="#1E3A5F" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
 
@@ -532,7 +548,6 @@ export default function FimitDashboard() {
                     dot={false}
                   />
 
-                  {/* Highlighted dot on selected month */}
                   {chartData.map(
                     (point, index) =>
                       point.isSelected && (
@@ -557,11 +572,10 @@ export default function FimitDashboard() {
           </div>
         </div>
 
-        {/* Add Categories Modal - Fixed with adminId prop */}
         <AddCategories
           isOpen={isModalOpen}
           onClose={closeCategoriesModal}
-          adminId={currentUser?.uid} // Pass the current user's UID as adminId
+          adminId={currentUser?.uid}
         />
       </div>
     </div>

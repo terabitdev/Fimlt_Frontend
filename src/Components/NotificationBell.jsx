@@ -1,3 +1,6 @@
+
+
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell } from 'lucide-react';
 import { db } from '../firebase';
@@ -12,16 +15,22 @@ import {
   where, 
   serverTimestamp, 
   doc,
-  writeBatch
+  writeBatch,
+  getDoc,
+  Timestamp,
+  deleteDoc
 } from 'firebase/firestore';
 
 function NotificationBell({ adminCode, userData }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isInitialized, setIsInitialized] = useState(false);
   const notificationRef = useRef(null);
   const unsubscribeRefs = useRef([]);
+  
+  // Track when listeners were established and if it's the initial load
+  const listenerStartTime = useRef(null);
+  const isInitialLoad = useRef(true);
 
   // Handle clicks outside notification dropdown to close it
   useEffect(() => {
@@ -42,7 +51,7 @@ function NotificationBell({ adminCode, userData }) {
       collection(db, 'notifications'),
       where('adminCode', '==', adminCode),
       orderBy('timestamp', 'desc'),
-      limit(20)
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
@@ -64,61 +73,74 @@ function NotificationBell({ adminCode, userData }) {
     return unsubscribe;
   }, []);
 
+  // Create notification helper function
+  const createNotification = async (notificationData) => {
+    try {
+      console.log('Creating notification:', notificationData);
+      await addDoc(collection(db, 'notifications'), {
+        ...notificationData,
+        timestamp: serverTimestamp()
+      });
+      console.log('Notification created successfully');
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
+  };
+
   // Set up listeners for user and project collections
-  const setupCollectionListeners = useCallback((adminCode) => {
+  const setupCollectionListeners = useCallback((adminCode, startTime) => {
     console.log('Setting up collection listeners for adminCode:', adminCode);
+    console.log('Start time for filtering:', startTime.toDate());
     
     // Set up listener for users collection
     const usersQuery = query(
       collection(db, 'users'),
-      orderBy('createdAt', 'desc')
+      where('adminCode', '==', adminCode),
+      orderBy('creationDate', 'desc')
     );
     
     const usersUnsubscribe = onSnapshot(usersQuery, (snapshot) => {
-      if (!isInitialized) {
-        console.log('Skipping initial user data load');
+      console.log('=== USERS LISTENER FIRED ===');
+      console.log('Users snapshot received, changes:', snapshot.docChanges().length);
+      console.log('Is initial load:', isInitialLoad.current);
+      
+      // Skip processing on initial load
+      if (isInitialLoad.current) {
+        console.log('Skipping user notifications - initial load');
         return;
       }
-
+      
       snapshot.docChanges().forEach(async (change) => {
-        if (change.type === 'added' || change.type === 'modified') {
+        if (change.type === 'added') {
           const userData = change.doc.data();
           const userId = change.doc.id;
-          const userAdminCode = userData.adminCode || userData.refralCode;
           
-          console.log('User change detected:', {
-            type: change.type,
+          console.log('New user detected:', {
             userId,
-            userAdminCode,
-            targetAdminCode: adminCode,
-            userType: userData.type
+            userName: userData.name,
+            userEmail: userData.email,
+            type: userData.type,
+            hasCreationDate: !!userData.creationDate
           });
+          
+          // Only process if it's a regular user
+          if (userData.type === 'User') {
+            const notificationData = {
+              adminCode: adminCode,
+              type: 'registration',
+              title: 'New User Registration',
+              message: `${userData.name || 'A new user'} (${userData.email}) has registered using your admin code.`,
+              metadata: { 
+                userName: userData.name, 
+                userEmail: userData.email,
+                userId: userId,
+                changeType: 'added'
+              },
+              read: false
+            };
 
-          // Only create notification if user matches admin code and is a regular user
-          if (userAdminCode === adminCode && userData.type === 'User') {
-            try {
-              const notificationData = {
-                adminCode: adminCode,
-                type: 'registration',
-                title: 'New User Registration',
-                message: change.type === 'modified' 
-                  ? `${userData.name || 'A new user'} (${userData.email}) has been assigned to your admin code.`
-                  : `${userData.name || 'A new user'} (${userData.email}) has registered using your admin code.`,
-                metadata: { 
-                  userName: userData.name, 
-                  userEmail: userData.email,
-                  userId: userId
-                },
-                read: false,
-                timestamp: serverTimestamp()
-              };
-
-              console.log('Creating user notification:', notificationData);
-              await addDoc(collection(db, 'notifications'), notificationData);
-              console.log('User notification created successfully');
-            } catch (error) {
-              console.error('Error creating user notification:', error);
-            }
+            console.log('Creating user registration notification');
+            await createNotification(notificationData);
           }
         }
       });
@@ -128,56 +150,98 @@ function NotificationBell({ adminCode, userData }) {
     
     // Set up listener for projects collection
     const projectsQuery = query(
-      collection(db, 'projects'), 
-      where('adminCode', '==', adminCode),
-      orderBy('createdAt', 'desc')
+      collection(db, 'projects'),
+      orderBy('creationDate', 'desc'),
+      limit(100)
     );
     
-    const projectsUnsubscribe = onSnapshot(projectsQuery, (snapshot) => {
-      if (!isInitialized) {
-        console.log('Skipping initial project data load');
+    const projectsUnsubscribe = onSnapshot(projectsQuery, async (snapshot) => {
+      console.log('=== PROJECTS LISTENER FIRED ===');
+      console.log('Projects snapshot received, total docs:', snapshot.docs.length);
+      console.log('Projects snapshot changes:', snapshot.docChanges().length);
+      console.log('Is initial load:', isInitialLoad.current);
+      
+      // Skip processing on initial load
+      if (isInitialLoad.current) {
+        console.log('Skipping project notifications - initial load');
         return;
       }
 
-      snapshot.docChanges().forEach(async (change) => {
+      for (const change of snapshot.docChanges()) {
+        console.log('Processing project change:', change.type);
+        
         if (change.type === 'added') {
           const projectData = change.doc.data();
+          const projectId = change.doc.id;
           
           console.log('New project detected:', {
-            projectId: change.doc.id,
+            projectId,
             projectName: projectData.name,
-            createdBy: projectData.createdBy
+            creatorID: projectData.creatorID,
+            hasCreatorID: !!projectData.creatorID
           });
-
+          
+          // Skip if no creatorID
+          if (!projectData.creatorID) {
+            console.log('No creatorID found - skipping project');
+            continue;
+          }
+          
+          // Check if the creator belongs to our adminCode
           try {
+            console.log('Checking if creator belongs to adminCode:', adminCode);
+            const creatorDoc = await getDoc(doc(db, 'users', projectData.creatorID));
+            
+            if (!creatorDoc.exists()) {
+              console.log('Creator not found in users collection - skipping');
+              continue;
+            }
+            
+            const creatorData = creatorDoc.data();
+            console.log('Creator data:', {
+              creatorId: projectData.creatorID,
+              creatorName: creatorData.name,
+              creatorAdminCode: creatorData.adminCode,
+              targetAdminCode: adminCode
+            });
+            
+            // Check if creator belongs to our adminCode
+            if (creatorData.adminCode !== adminCode) {
+              console.log('Creator does not belong to our adminCode - skipping');
+              continue;
+            }
+            
+            console.log('Creator belongs to our adminCode - creating notification');
+            
             const notificationData = {
               adminCode: adminCode,
               type: 'project_added',
               title: 'New Project Added',
-              message: `${projectData.createdBy || 'A user'} has added a new project: ${projectData.name || 'Untitled Project'}`,
+              message: `${creatorData.name || 'A user'} has added a new project: ${projectData.name || 'Untitled Project'}`,
               metadata: { 
                 projectName: projectData.name, 
-                createdBy: projectData.createdBy,
-                projectId: change.doc.id
+                creatorID: projectData.creatorID,
+                creatorName: creatorData.name,
+                projectId: projectId
               },
-              read: false,
-              timestamp: serverTimestamp()
+              read: false
             };
 
             console.log('Creating project notification:', notificationData);
-            await addDoc(collection(db, 'notifications'), notificationData);
-            console.log('Project notification created successfully');
+            await createNotification(notificationData);
+            console.log('Project notification created successfully!');
+            
           } catch (error) {
-            console.error('Error creating project notification:', error);
+            console.error('Error processing project notification:', error);
           }
         }
-      });
+      }
     }, (error) => {
       console.error('Error in projects listener:', error);
     });
     
     return [usersUnsubscribe, projectsUnsubscribe];
-  }, [isInitialized]);
+  }, []);
 
   // Set up notification listeners when adminCode changes
   useEffect(() => {
@@ -192,15 +256,25 @@ function NotificationBell({ adminCode, userData }) {
     if (adminCode && adminCode !== 'N/A') {
       console.log('Setting up listeners for adminCode:', adminCode);
       
-      // Set up notification listeners
+      // Reset initial load flag
+      isInitialLoad.current = true;
+      
+      // Set the listener start time
+      listenerStartTime.current = Timestamp.now();
+      
+      // Set up notification listeners first
       const notificationUnsubscribe = setupNotificationListeners(adminCode);
       unsubscribeRefs.current.push(notificationUnsubscribe);
       
-      // Wait a bit before setting up collection listeners to avoid initial data triggering notifications
+      // Set up collection listeners
+      const collectionUnsubscribes = setupCollectionListeners(adminCode, listenerStartTime.current);
+      unsubscribeRefs.current.push(...collectionUnsubscribes);
+      
+      // After a short delay, mark as no longer initial load
+      // This allows the initial snapshot to complete without triggering notifications
       const timer = setTimeout(() => {
-        setIsInitialized(true);
-        const collectionUnsubscribes = setupCollectionListeners(adminCode);
-        unsubscribeRefs.current.push(...collectionUnsubscribes);
+        console.log('Marking as no longer initial load - new changes will trigger notifications');
+        isInitialLoad.current = false;
       }, 2000); // 2 second delay
       
       return () => {
@@ -210,10 +284,7 @@ function NotificationBell({ adminCode, userData }) {
             unsubscribe();
           }
         });
-        setIsInitialized(false);
       };
-    } else {
-      setIsInitialized(false);
     }
   }, [adminCode, setupNotificationListeners, setupCollectionListeners]);
 
@@ -251,6 +322,21 @@ function NotificationBell({ adminCode, userData }) {
     }
   };
 
+  // Clear all notifications
+  const clearAllNotifications = async () => {
+    try {
+      const batch = writeBatch(db);
+      notifications.forEach(notification => {
+        const notificationRef = doc(db, 'notifications', notification.id);
+        batch.delete(notificationRef);
+      });
+      await batch.commit();
+      console.log('All notifications cleared');
+    } catch (error) {
+      console.error('Error clearing all notifications:', error);
+    }
+  };
+
   // Format the timestamp for display
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return 'Just now';
@@ -282,7 +368,7 @@ function NotificationBell({ adminCode, userData }) {
         <Bell size={20} className='text-black' />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-            {unreadCount}
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
@@ -292,14 +378,24 @@ function NotificationBell({ adminCode, userData }) {
         <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg z-50 overflow-hidden">
           <div className="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 className="text-lg font-semibold text-gray-800">Notifications</h3>
-            {unreadCount > 0 && (
-              <button 
-                className="text-sm text-blue-500 hover:text-blue-700"
-                onClick={markAllAsRead}
-              >
-                Mark all as read
-              </button>
-            )}
+            <div className="flex gap-2">
+              {notifications.length > 0 && (
+                <button 
+                  className="text-xs text-red-500 hover:text-red-700 px-2 py-1 border border-red-300 rounded"
+                  onClick={clearAllNotifications}
+                >
+                  Clear All
+                </button>
+              )}
+              {unreadCount > 0 && (
+                <button 
+                  className="text-sm text-blue-500 hover:text-blue-700"
+                  onClick={markAllAsRead}
+                >
+                  Mark all as read
+                </button>
+              )}
+            </div>
           </div>
           <div className="max-h-80 overflow-y-auto">
             {notifications.length > 0 ? (
@@ -322,19 +418,24 @@ function NotificationBell({ adminCode, userData }) {
                         </div>
                       )}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-medium text-gray-800">{notification.title}</p>
-                      <p className="text-xs text-gray-500">{notification.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">{notification.message}</p>
                       <p className="text-xs text-gray-400 mt-1">
                         {formatTimestamp(notification.timestamp)}
                       </p>
                     </div>
+                    {!notification.read && (
+                      <div className="flex-shrink-0 ml-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
             ) : (
               <div className="p-4 text-center text-gray-500">
-                No notifications
+                No notifications yet
               </div>
             )}
           </div>

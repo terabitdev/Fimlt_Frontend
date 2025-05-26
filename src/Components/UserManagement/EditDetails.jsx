@@ -12,104 +12,188 @@ import ModelViewer from './ModelViewer'; // Adjust this path
 function RoomMeasurementInterface({ projectData, onUpdateDetails, onUpdatePreview }) {
   const navigate = useNavigate();
   
-  // State for room details and editing
-  const [roomDetails, setRoomDetails] = useState([]);
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [editValue, setEditValue] = useState("");
+  // State for editing
   const [projectName, setProjectName] = useState(projectData?.name || "");
   const [projectDescription, setProjectDescription] = useState(projectData?.description || "");
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  
+  // States for editing individual room details
+  const [editingField, setEditingField] = useState(null); // { type: 'category'|'name'|'dimension'|'other', index: number }
+  const [editValue, setEditValue] = useState("");
 
-  // Process room details from projectData when it changes
-  useEffect(() => {
-    if (projectData) {
-      const details = [];
+  // Process room details from roomData array - grouped by category (same as ProjectDetails)
+  const processRoomDetails = () => {
+    const groupedDetails = {
+      category: [],
+      names: [],
+      dimensions: [],
+      other: []
+    };
+    
+    // Add main category if available
+    if (projectData?.category) {
+      groupedDetails.category.push(projectData.category);
+    }
+    
+    // Process roomData array
+    if (projectData?.roomData && Array.isArray(projectData.roomData)) {
+      console.log("Room data for display:", projectData.roomData);
       
-      // Add category if available
-      if (projectData.category) {
-        details.push({ category: "Category", value: projectData.category, key: "category" });
-      }
-      
-      // Process roomData array
-      if (projectData.roomData && Array.isArray(projectData.roomData)) {
-        projectData.roomData.forEach((item, index) => {
-          // Handle different data formats within roomData
-          if (item && typeof item === 'object') {
-            // If item is an object with name/value pairs
-            if (item.name && item.value !== undefined) {
-              details.push({ category: item.name, value: item.value, key: `roomData[${index}].value` });
+      projectData.roomData.forEach((item, index) => {
+        if (item && typeof item === 'object') {
+          // If item is an object with name/value pairs
+          if (item.name && item.value !== undefined) {
+            const key = item.name.toLowerCase();
+            if (key.includes('name') || key.includes('room')) {
+              groupedDetails.names.push(item.value);
+            } else if (key.includes('dimension') || key.includes('size') || key.includes('area') || key.includes('length') || key.includes('width') || key.includes('height')) {
+              groupedDetails.dimensions.push(item.value);
+            } else {
+              groupedDetails.other.push({ name: item.name, value: item.value });
             }
-            // If item is an object with other properties
-            else {
-              // Extract all properties from the object
-              Object.entries(item).forEach(([key, value]) => {
-                // Format the key for display (capitalize first letter, add spaces before capitals)
+          }
+          // If item is an object with other properties
+          else {
+            Object.entries(item).forEach(([key, value]) => {
+              const lowerKey = key.toLowerCase();
+              if (lowerKey.includes('name') || lowerKey.includes('room')) {
+                groupedDetails.names.push(value);
+              } else if (lowerKey.includes('dimension') || lowerKey.includes('size') || lowerKey.includes('area') || lowerKey.includes('length') || lowerKey.includes('width') || lowerKey.includes('height')) {
+                groupedDetails.dimensions.push(value);
+              } else {
                 const formattedKey = key
                   .replace(/([A-Z])/g, ' $1')
                   .replace(/^./, str => str.toUpperCase());
-                
-                details.push({ 
-                  category: formattedKey, 
-                  value: value, 
-                  key: `roomData[${index}].${key}` 
-                });
-              });
-            }
-          }
-          // If item is a primitive value (string, number)
-          else if (item !== undefined) {
-            // Use predefined labels based on index position
-            const labels = ["Dimensions", "Name", "Value", "Property"];
-            const label = index < labels.length ? labels[index] : `Property ${index + 1}`;
-            details.push({ 
-              category: label, 
-              value: item, 
-              key: `roomData[${index}]` 
+                groupedDetails.other.push({ name: formattedKey, value: value });
+              }
             });
           }
-        });
-      }
-      
-      setRoomDetails(details);
+        }
+        // If item is a primitive value (string, number)
+        else if (item !== undefined) {
+          // Try to determine what type of data this is based on content
+          const itemString = item.toString().toLowerCase();
+          if (itemString.includes('room') || itemString.includes('name')) {
+            groupedDetails.names.push(item);
+          } else if (itemString.includes('dimension') || itemString.includes('size') || itemString.includes('area') || /\d+\s*(x|×|by)\s*\d+/.test(itemString)) {
+            groupedDetails.dimensions.push(item);
+          } else {
+            groupedDetails.other.push({ name: `Property ${index + 1}`, value: item });
+          }
+        }
+      });
+    }
+    
+    return groupedDetails;
+  };
+
+  // Update project name and description when projectData changes
+  useEffect(() => {
+    if (projectData) {
       setProjectName(projectData.name || "");
       setProjectDescription(projectData.description || "");
     }
   }, [projectData]);
 
-  // Handle starting to edit a field - UPDATED
-  const handleEditClick = (index) => {
-    // Store the current index being edited
-    setEditingIndex(index);
+  // Handle starting to edit a field
+  const handleEditClick = (type, index = 0) => {
+    const roomDetails = processRoomDetails();
+    let currentValue = "";
     
-    // Ensure we're setting the value correctly
-    const currentValue = roomDetails[index].value;
-    console.log("Setting edit value:", currentValue); // Debug log
+    switch (type) {
+      case 'category':
+        currentValue = roomDetails.category[0] || "";
+        break;
+      case 'name':
+        currentValue = roomDetails.names[index] || "";
+        break;
+      case 'dimension':
+        currentValue = roomDetails.dimensions[index] || "";
+        break;
+      case 'other':
+        currentValue = roomDetails.other[index]?.value || "";
+        break;
+    }
     
-    // Set the edit value with explicit string conversion
-    setEditValue(String(currentValue || ''));
+    setEditingField({ type, index });
+    setEditValue(String(currentValue));
   };
 
-  // Handle input change - UPDATED
+  // Handle input change
   const handleInputChange = (e) => {
-    console.log("Input changed to:", e.target.value); // Debug log
     setEditValue(e.target.value);
   };
 
   // Handle saving the edited value
-  const handleSave = (index) => {
-    const updatedDetails = [...roomDetails];
-    updatedDetails[index] = { ...updatedDetails[index], value: editValue };
-    setRoomDetails(updatedDetails);
-    setEditingIndex(null);
+  const handleSave = () => {
+    if (!editingField || !projectData) return;
+    
+    // Create a deep copy of roomData
+    const updatedRoomData = projectData.roomData ? [...projectData.roomData] : [];
+    let updatedCategory = projectData.category;
+    
+    const { type, index } = editingField;
+    
+    // Update the appropriate field based on type
+    switch (type) {
+      case 'category':
+        updatedCategory = editValue;
+        break;
+      case 'name':
+        // Find and update name in roomData
+        // This is a simplified approach - you might need to adjust based on your data structure
+        if (updatedRoomData[index]) {
+          if (typeof updatedRoomData[index] === 'object' && updatedRoomData[index].name) {
+            updatedRoomData[index].value = editValue;
+          } else {
+            updatedRoomData[index] = editValue;
+          }
+        }
+        break;
+      case 'dimension':
+        // Similar logic for dimensions
+        if (updatedRoomData[index]) {
+          if (typeof updatedRoomData[index] === 'object') {
+            updatedRoomData[index].value = editValue;
+          } else {
+            updatedRoomData[index] = editValue;
+          }
+        }
+        break;
+      case 'other':
+        // Handle other properties
+        if (updatedRoomData[index]) {
+          if (typeof updatedRoomData[index] === 'object') {
+            updatedRoomData[index].value = editValue;
+          } else {
+            updatedRoomData[index] = editValue;
+          }
+        }
+        break;
+    }
+    
+    // Update the project data
+    const updatedProject = {
+      ...projectData,
+      category: updatedCategory,
+      roomData: updatedRoomData
+    };
+    
+    // Send updated data to parent component
+    if (onUpdateDetails) {
+      onUpdateDetails(updatedProject);
+    }
+    
+    setEditingField(null);
   };
 
   // Handle key press (Enter to save, Escape to cancel)
-  const handleKeyDown = (e, index) => {
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
-      handleSave(index);
+      handleSave();
     } else if (e.key === 'Escape') {
-      setEditingIndex(null);
+      setEditingField(null);
     }
   };
 
@@ -118,47 +202,19 @@ function RoomMeasurementInterface({ projectData, onUpdateDetails, onUpdatePrevie
     if (!projectData?.id) return;
     
     // Create updated project data object
-    const updatedProject = { ...projectData };
-    
-    // Update name and description
-    updatedProject.name = projectName;
-    updatedProject.description = projectDescription;
-    
-    // Update room details
-    roomDetails.forEach(detail => {
-      if (detail.key.startsWith('roomData')) {
-        // Handle nested roomData properties
-        const path = detail.key.split('.');
-        const roomDataIndex = parseInt(path[0].match(/\d+/)[0]);
-        
-        // Ensure roomData array exists
-        if (!updatedProject.roomData) {
-          updatedProject.roomData = [];
-        }
-        
-        // Ensure roomData item exists
-        if (!updatedProject.roomData[roomDataIndex]) {
-          updatedProject.roomData[roomDataIndex] = {};
-        }
-        
-        if (path.length === 1) {
-          // Direct roomData array item
-          updatedProject.roomData[roomDataIndex] = detail.value;
-        } else {
-          // Nested property in roomData object
-          const propertyName = path[1];
-          updatedProject.roomData[roomDataIndex][propertyName] = detail.value;
-        }
-      } else if (detail.key === 'category') {
-        updatedProject.category = detail.value;
-      }
-    });
+    const updatedProject = {
+      ...projectData,
+      name: projectName,
+      description: projectDescription
+    };
     
     // Send updated data to parent component
     if (onUpdateDetails) {
       onUpdateDetails(updatedProject);
     }
   };
+
+  const roomDetails = processRoomDetails();
 
   return (
     <div className="min-h-screen max-w-[22rem] md:max-w-5xl xl:max-w-7xl bg-[#1E3A5F] rounded-xl">
@@ -183,11 +239,11 @@ function RoomMeasurementInterface({ projectData, onUpdateDetails, onUpdatePrevie
             />
           ) : (
             <div 
-              className="font-[700] text-2xl md:text-[31px] text-white flex items-center"
+              className="font-[700] text-2xl md:text-[31px] text-white flex items-center cursor-pointer"
               onClick={() => setIsEditingName(true)}
             >
               {projectName || 'Unnamed Project'}
-              <CiEdit size={20} className="text-white ml-2 cursor-pointer" />
+              <CiEdit size={20} className="text-white ml-2" />
             </div>
           )}
           
@@ -209,11 +265,11 @@ function RoomMeasurementInterface({ projectData, onUpdateDetails, onUpdatePrevie
             />
           ) : (
             <div 
-              className="font-[500] text-sm md:text-[20px] text-white flex items-center"
+              className="font-[500] text-sm md:text-[20px] text-white flex items-center cursor-pointer"
               onClick={() => setIsEditingDescription(true)}
             >
               {projectDescription || 'No description available'}
-              <CiEdit size={20} className="text-white ml-2 cursor-pointer" />
+              <CiEdit size={20} className="text-white ml-2" />
             </div>
           )}
         </div>
@@ -252,43 +308,166 @@ function RoomMeasurementInterface({ projectData, onUpdateDetails, onUpdatePrevie
           </button>
         </div>
 
-        {/* Room Details Table - UPDATED */}
+        {/* Room Details Table - Updated to match ProjectDetails format */}
         <div className="p-4 md:w-[583px] md:h-[370px] max-w-sm rounded-3xl bg-white overflow-y-auto scrollbar-hide">
-          <div className="w-full font-SFProDisplay">
-            {roomDetails.length > 0 ? (
-              roomDetails.map((detail, index) => (
-                <div key={index} className="flex items-center justify-between py-1">
-                  <div className="text-xl font-[400] text-[#090D00]">
-                    {detail.category}
-                  </div>
-                  <div className="flex items-center">
-                    {editingIndex === index ? (
-                      <input
-                        type="text"
-                        value={editValue}
-                        onChange={handleInputChange}
-                        onBlur={() => handleSave(index)}
-                        onKeyDown={(e) => handleKeyDown(e, index)}
-                        className="border border-[#090D00] rounded-sm px-1 py-1 text-right w-40 mr-2 text-lg font-medium text-black"
-                        autoFocus
-                      />
-                    ) : (
-                      <div className="border border-[#090D00] text-black rounded-sm px-1 py-1 text-right w-40 mr-2 text-lg font-medium">
-                        {detail.value}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => handleEditClick(index)}
-                      className="p-2"
-                      aria-label={`Edit ${detail.category}`}
-                    >
-                      <CiEdit size={25} className="text-[#090D00]" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-4 text-gray-500">No room details available</div>
+          <div className="w-full h-full font-SFProDisplay">
+            <table className="w-full">
+              <tbody>
+                {/* Category Row */}
+                {roomDetails.category.length > 0 && (
+                  <>
+                    <tr>
+                      <td className="text-left py-1 px-2 font-[600] text-[#090D00] text-lg border-b border-gray-200">
+                        Category
+                      </td>
+                      <td className="text-right py-1 px-2">
+                        <button
+                          onClick={() => handleEditClick('category', 0)}
+                          className="p-1"
+                          aria-label="Edit Category"
+                        >
+                          <CiEdit size={20} className="text-[#090D00]" />
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan="2" className="text-left py-1 px-2 font-[400] text-[#090D00]">
+                        {editingField?.type === 'category' && editingField?.index === 0 ? (
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={handleInputChange}
+                            onBlur={handleSave}
+                            onKeyDown={handleKeyDown}
+                            className="w-full border border-[#090D00] rounded-sm px-2 py-1 text-black"
+                            autoFocus
+                          />
+                        ) : (
+                          roomDetails.category[0]
+                        )}
+                      </td>
+                    </tr>
+                  </>
+                )}
+
+                {/* Name and Dimensions Header Row */}
+                {(roomDetails.names.length > 0 || roomDetails.dimensions.length > 0) && (
+                  <tr>
+                    <td className="text-left py-1 px-2 font-[600] text-[#090D00] text-lg border-b border-gray-200 pt-4">
+                      Name
+                    </td>
+                    <td className="text-right py-1 px-2 font-[600] text-[#090D00] text-lg border-b border-gray-200 pt-4">
+                      Dimension
+                    </td>
+                  </tr>
+                )}
+
+                {/* Name and Dimension Rows */}
+                {Math.max(roomDetails.names.length, roomDetails.dimensions.length) > 0 && 
+                  Array.from({ length: Math.max(roomDetails.names.length, roomDetails.dimensions.length) }).map((_, index) => (
+                    <tr key={`name-dimension-${index}`}>
+                      <td className="text-left py-1 px-2 font-[400] text-[#090D00] relative">
+                        <div className="flex items-center justify-between">
+                          {editingField?.type === 'name' && editingField?.index === index ? (
+                            <input
+                              type="text"
+                              value={editValue}
+                              onChange={handleInputChange}
+                              onBlur={handleSave}
+                              onKeyDown={handleKeyDown}
+                              className="flex-1 border border-[#090D00] rounded-sm px-2 py-1 text-black mr-2"
+                              autoFocus
+                            />
+                          ) : (
+                            <span>{roomDetails.names[index] || `Room ${index + 1}`}</span>
+                          )}
+                          <button
+                            onClick={() => handleEditClick('name', index)}
+                            className="p-1"
+                            aria-label={`Edit Name ${index + 1}`}
+                          >
+                            <CiEdit size={16} className="text-[#090D00]" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="text-right py-1 px-2 font-medium text-[#090D00] relative">
+                        <div className="flex items-center justify-end">
+                          {editingField?.type === 'dimension' && editingField?.index === index ? (
+                            <input
+                              type="text"
+                              value={editValue}
+                              onChange={handleInputChange}
+                              onBlur={handleSave}
+                              onKeyDown={handleKeyDown}
+                              className="flex-1 border border-[#090D00] rounded-sm px-2 py-1 text-black mr-2 text-right"
+                              autoFocus
+                            />
+                          ) : (
+                            <span>{roomDetails.dimensions[index] || ''}</span>
+                          )}
+                          <button
+                            onClick={() => handleEditClick('dimension', index)}
+                            className="p-1"
+                            aria-label={`Edit Dimension ${index + 1}`}
+                          >
+                            <CiEdit size={16} className="text-[#090D00]" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                }
+
+                {/* Other Properties Section */}
+                {roomDetails.other.length > 0 && (
+                  <>
+                    <tr>
+                      <td colSpan="2" className="text-left py-1 px-2 font-[600] text-[#090D00] text-lg border-b border-gray-200 pt-4">
+                        Other Properties
+                      </td>
+                    </tr>
+                    {roomDetails.other.map((detail, index) => (
+                      <tr key={`other-${index}`}>
+                        <td className="text-left py-1 px-2 font-[400] text-[#090D00]">
+                          {detail.name}
+                        </td>
+                        <td className="text-right py-1 px-2 font-medium text-[#090D00] relative">
+                          <div className="flex items-center justify-end">
+                            {editingField?.type === 'other' && editingField?.index === index ? (
+                              <input
+                                type="text"
+                                value={editValue}
+                                onChange={handleInputChange}
+                                onBlur={handleSave}
+                                onKeyDown={handleKeyDown}
+                                className="flex-1 border border-[#090D00] rounded-sm px-2 py-1 text-black mr-2 text-right"
+                                autoFocus
+                              />
+                            ) : (
+                              <span>{detail.value}</span>
+                            )}
+                            <button
+                              onClick={() => handleEditClick('other', index)}
+                              className="p-1"
+                              aria-label={`Edit ${detail.name}`}
+                            >
+                              <CiEdit size={16} className="text-[#090D00]" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+              </tbody>
+            </table>
+
+            {/* No Data Message */}
+            {roomDetails.category.length === 0 && roomDetails.names.length === 0 && 
+             roomDetails.dimensions.length === 0 && roomDetails.other.length === 0 && (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-center text-gray-500">No room details available</p>
+              </div>
             )}
           </div>
         </div>

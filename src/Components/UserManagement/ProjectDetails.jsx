@@ -6,13 +6,13 @@ import TopBar from '../../Components/TopBar';
 import { Edit, Trash2} from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../firebase';
-import { doc, getDoc, deleteDoc } from 'firebase/firestore'; // Added deleteDoc
+import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { 
   getStorage, 
   ref as storageRef, 
   getDownloadURL, 
   deleteObject 
-} from 'firebase/storage'; // Added deleteObject
+} from 'firebase/storage';
 import '@google/model-viewer';
 import ModelViewer from './ModelViewer';
 
@@ -95,9 +95,9 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
   };
   
   // Confirm delete action
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (onDeleteProject) {
-      onDeleteProject(projectData.id);
+      await onDeleteProject(projectData.id);
     }
     setIsDeleteConfirmOpen(false);
   };
@@ -121,13 +121,13 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
         <div className="flex items-center justify-center gap-3 font-Urbanist h-12">
           <button 
             onClick={() => navigate(`/edit-details/${projectData?.id}`)}
-            className="bg-[#1E3A5F] border border-white text-white px-3 py-1 rounded-lg text-sm flex items-center"
+            className="bg-[#1E3A5F] border border-white text-white px-3 py-1 rounded-lg text-sm flex items-center hover:bg-blue-700 transition-colors"
           >
             <Edit size={16} className="mr-1" /> Edit
           </button>
           <button 
             onClick={handleDeleteClick}
-            className="bg-[#FB0000] border border-[#FB0000] text-white px-3 py-1 rounded-lg text-sm flex items-center"
+            className="bg-[#FB0000] border border-[#FB0000] text-white px-3 py-1 rounded-lg text-sm flex items-center hover:bg-red-700 transition-colors"
           >
             <Trash2 size={16} className="mr-1" /> Delete
           </button>
@@ -238,24 +238,29 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
       {/* Delete Confirmation Dialog */}
       {isDeleteConfirmOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
             <h3 className="text-xl font-bold text-gray-800 mb-4">Confirm Delete</h3>
             <p className="text-gray-600 mb-6">
               Are you sure you want to delete the project "{projectData?.name || 'Unnamed Project'}"? 
-              This action cannot be undone.
+              This action cannot be undone and will permanently remove:
             </p>
+            <ul className="text-gray-600 mb-6 ml-4 list-disc">
+              <li>Project data and details</li>
+              <li>3D model files</li>
+              <li>Preview images</li>
+            </ul>
             <div className="flex justify-end space-x-4">
               <button
                 onClick={cancelDelete}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
               >
-                Delete
+                Delete Project
               </button>
             </div>
           </div>
@@ -284,66 +289,86 @@ function ProjectDetails() {
     }
   };
   
-  // Handle project deletion
+  // Handle project deletion with improved error handling and user feedback
   const handleDeleteProject = async (id) => {
-    if (!id) return;
+    if (!id) {
+      console.error('No project ID provided for deletion');
+      return;
+    }
     
     try {
       setDeleteStatus({ loading: true, error: null });
-      console.log('Deleting project:', id);
+      console.log('Starting deletion process for project:', id);
       
-      // 1. Delete associated files from Storage
       const storage = getStorage();
+      const deletionTasks = [];
       
-      // Delete 3D model if exists
-      if (projectData.usdFileUrl && !projectData.usdFileUrl.startsWith('http')) {
-        try {
-          const modelRef = storageRef(storage, projectData.usdFileUrl);
-          await deleteObject(modelRef);
-          console.log('Deleted 3D model file');
-        } catch (err) {
-          console.error('Error deleting 3D model file:', err);
-          // Continue deletion process even if file deletion fails
-        }
+      // 1. Delete 3D model file if exists
+      if (projectData?.usdFileUrl && !projectData.usdFileUrl.startsWith('http')) {
+        const modelRef = storageRef(storage, projectData.usdFileUrl);
+        deletionTasks.push(
+          deleteObject(modelRef)
+            .then(() => console.log('✓ 3D model file deleted'))
+            .catch(err => console.warn('⚠ Could not delete 3D model file:', err.message))
+        );
       }
       
-      // Delete preview image if exists
-      if (projectData.previewImageUrl && projectData.previewImageUrl.includes('projects')) {
-        try {
-          // Extract the path from the URL if needed
-          const previewPath = `projects/${id}/preview.png`;
-          const previewRef = storageRef(storage, previewPath);
-          await deleteObject(previewRef);
-          console.log('Deleted preview image');
-        } catch (err) {
-          console.error('Error deleting preview image:', err);
-          // Continue deletion process even if file deletion fails
-        }
+      // 2. Delete preview image if exists
+      if (projectData?.previewImageUrl && projectData.previewImageUrl.includes('projects')) {
+        const previewPath = `projects/${id}/preview.png`;
+        const previewRef = storageRef(storage, previewPath);
+        deletionTasks.push(
+          deleteObject(previewRef)
+            .then(() => console.log('✓ Preview image deleted'))
+            .catch(err => console.warn('⚠ Could not delete preview image:', err.message))
+        );
       }
       
-      // 2. Delete the project document from Firestore
+      // Execute all file deletions in parallel
+      await Promise.allSettled(deletionTasks);
+      
+      // 3. Delete the project document from Firestore
       const projectRef = doc(db, "projects", id);
       await deleteDoc(projectRef);
-      console.log('Project document deleted successfully');
+      console.log('✓ Project document deleted from Firestore');
       
-      // 3. Navigate back to projects list
+      // 4. Success - navigate to user details page
       setDeleteStatus({ loading: false, error: null });
-      alert('Project deleted successfully');
-      navigate(`/edit-details ${projectId}`); 
+      console.log('✓ Project deletion completed successfully');
+      
+      // Navigate to user details page to show remaining projects
+      navigate('/dashboard', { 
+        replace: true,
+        state: { 
+          message: `Project "${projectData?.name || 'Unnamed Project'}" has been deleted successfully.`,
+          type: 'success'
+        }
+      });
       
     } catch (err) {
-      console.error('Error deleting project:', err);
-      setDeleteStatus({ loading: false, error: err.message });
+      console.error('✗ Error during project deletion:', err);
+      setDeleteStatus({ 
+        loading: false, 
+        error: err.message || 'An unexpected error occurred while deleting the project'
+      });
+      
+      // Show error alert
       alert(`Failed to delete project: ${err.message}`);
     }
   };
   
   useEffect(() => {
     const fetchProjectData = async () => {
-      if (!projectId) return;
+      if (!projectId) {
+        setError("No project ID provided");
+        setLoading(false);
+        return;
+      }
       
       try {
         setLoading(true);
+        setError(null);
+        
         // 1. Fetch project document
         const projectRef = doc(db, "projects", projectId);
         const projectSnap = await getDoc(projectRef);
@@ -361,11 +386,10 @@ function ProjectDetails() {
         if (projectData.usdFileUrl) {
           try {
             const storage = getStorage();
-            // Get file reference
             const fileRef = storageRef(storage, projectData.usdFileUrl);
             
+            // Try to get metadata for format detection
             try {
-              // This may not be supported in all Firebase setups
               const metadata = await fileRef.getMetadata();
               console.log('File metadata:', metadata);
               if (metadata.contentType) {
@@ -379,16 +403,15 @@ function ProjectDetails() {
             modelUrl = await getDownloadURL(fileRef);
             console.log('Retrieved model URL:', modelUrl);
             
-            // If no format detected, try to determine from URL
+            // If no format detected from metadata, determine from URL
             if (!modelFormat) {
               const fileExtension = modelUrl.split('?')[0].split('.').pop().toLowerCase();
-              if (fileExtension === 'glb') {
-                setModelFormat('model/gltf-binary');
-              } else if (fileExtension === 'gltf') {
-                setModelFormat('model/gltf+json');
-              } else if (fileExtension === 'usdz') {
-                setModelFormat('model/vnd.usdz+zip');
-              }
+              const formatMap = {
+                'glb': 'model/gltf-binary',
+                'gltf': 'model/gltf+json',
+                'usdz': 'model/vnd.usdz+zip'
+              };
+              setModelFormat(formatMap[fileExtension] || null);
             }
           } catch (e) {
             console.error('Could not load model URL:', e);
@@ -398,22 +421,18 @@ function ProjectDetails() {
         // Set project data with all required fields
         setProjectData({
           id: projectId,
-          // Core project info
           name: projectData.name || 'Unnamed Project',
           description: projectData.description || '',
-          
-          // Actual Firebase fields - keep what's in the actual database
           category: projectData.category || '',
           roomData: projectData.roomData || [],
-          
-          // 3D model info
           usdFileUrl: modelUrl,
           modelFormat: modelFormat,
           previewImageUrl: projectData.previewImageUrl || null
         });
+        
       } catch (err) {
         console.error("Error fetching project data:", err);
-        setError("Failed to load project data");
+        setError("Failed to load project data. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -421,6 +440,11 @@ function ProjectDetails() {
 
     fetchProjectData();
   }, [projectId, modelFormat]);
+
+  // Handle back navigation
+  const handleBackClick = () => {
+    navigate('/user-details');
+  };
 
   return (
     <div className="flex min-h-screen h-full bg-black text-white">
@@ -430,34 +454,57 @@ function ProjectDetails() {
         <div className="flex justify-between font-DMSansRegular items-center mb-6">
           <h1 className="text-2xl md:text-3xl font-[500]">Project Details</h1>
           <button
-            onClick={() => navigate(-1)}
-            className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md"
+            onClick={handleBackClick}
+            className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
           >
-            Back
+            Back to Projects
           </button>
         </div>  
         
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <p className="text-white">Loading project data...</p>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+              <p className="text-white">Loading project data...</p>
+            </div>
           </div>
         ) : deleteStatus.loading ? (
           <div className="flex items-center justify-center h-64">
-            <p className="text-white">Deleting project...</p>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto mb-4"></div>
+              <p className="text-white">Deleting project...</p>
+              <p className="text-gray-400 text-sm mt-2">This may take a moment</p>
+            </div>
           </div>
         ) : error ? (
           <div className="p-4 bg-red-500 text-white rounded-lg">
-            {error}
+            <h3 className="font-bold mb-2">Error</h3>
+            <p>{error}</p>
+            <button 
+              onClick={() => navigate('/user-details')}
+              className="mt-3 bg-white text-red-500 px-4 py-2 rounded hover:bg-gray-100 transition-colors"
+            >
+              Go Back to Projects
+            </button>
           </div>
         ) : deleteStatus.error ? (
           <div className="p-4 bg-red-500 text-white rounded-lg">
+            <h3 className="font-bold mb-2">Deletion Failed</h3>
             <p>Error deleting project: {deleteStatus.error}</p>
-            <button 
-              onClick={() => setDeleteStatus({ loading: false, error: null })}
-              className="mt-2 bg-white text-red-500 px-3 py-1 rounded"
-            >
-              Dismiss
-            </button>
+            <div className="mt-3 space-x-2">
+              <button 
+                onClick={() => setDeleteStatus({ loading: false, error: null })}
+                className="bg-white text-red-500 px-4 py-2 rounded hover:bg-gray-100 transition-colors"
+              >
+                Try Again
+              </button>
+              <button 
+                onClick={() => navigate('/user-details')}
+                className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors"
+              >
+                Go Back
+              </button>
+            </div>
           </div>
         ) : (
           <RoomMeasurementInterface 

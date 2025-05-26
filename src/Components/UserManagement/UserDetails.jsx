@@ -8,7 +8,6 @@ import { db } from '../../firebase'; // adjust if needed
 import SideBar from '../../Components/SideBar';
 import TopBar from '../../Components/TopBar';
 import ProjectCard from '../UserManagement/ProjectCard';
-import { Edit, Trash2 } from 'lucide-react';
 
 function FacilityDashboard({ userData, projects, loading }) {
   const navigate = useNavigate();
@@ -38,17 +37,6 @@ function FacilityDashboard({ userData, projects, loading }) {
           <h2 className="text-white font-[600]">
             Projects: <span className="font-[400]">{projects.length}</span>
           </h2>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => navigate(`/edit-details/${userData.id}`)}
-            className="bg-[#1E3A5F] border border-white text-white px-3 py-1 rounded-lg text-sm flex items-center"
-          >
-            <Edit size={16} className="mr-1" /> Edit
-          </button>
-          <button className="bg-[#FB0000] border border-[#FB0000] text-white px-3 py-1 rounded-lg text-sm flex items-center">
-            <Trash2 size={16} className="mr-1" /> Delete
-          </button>
         </div>
       </div>
 
