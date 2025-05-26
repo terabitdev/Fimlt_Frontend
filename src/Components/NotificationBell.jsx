@@ -81,7 +81,7 @@ function NotificationBell({ adminCode, userData }) {
         ...notificationData,
         timestamp: serverTimestamp()
       });
-      console.log('Notification created successfully');
+      // console.log('Notification created successfully');
     } catch (error) {
       console.error('Error creating notification:', error);
     }
