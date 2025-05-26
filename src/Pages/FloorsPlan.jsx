@@ -198,9 +198,6 @@ const RecentFloorScansTable = ({ searchTerm = '', onSearchHandlerReady }) => {
                   Date
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-900 border-t border-b border-gray-200">
-                  Rooms
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-sm font-medium text-gray-900 border-t border-b border-gray-200">
                   View
                 </th>
               </tr>
@@ -216,9 +213,6 @@ const RecentFloorScansTable = ({ searchTerm = '', onSearchHandlerReady }) => {
                   </td>
                   <td className="px-6 py-2 whitespace-nowrap text-sm text-[#1A1C21]">
                     {scan.date}
-                  </td>
-                  <td className="px-6 py-2 whitespace-nowrap text-sm text-[#1A1C21]">
-                    {scan.room}
                   </td>
                   <td className="px-6 py-2 whitespace-nowrap">
                     <Link to={`/project-details-floors-plan/${scan.id}`}>

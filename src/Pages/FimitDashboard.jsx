@@ -19,6 +19,7 @@ import {
   Info,
   Plus,
   ChevronDown,
+  X,
 } from "lucide-react";
 import { auth, db } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -26,7 +27,7 @@ import {
   collection,
   query,
   where,
-  onSnapshot, // Import onSnapshot for real-time updates
+  onSnapshot,
   doc,
   getDoc,
 } from "firebase/firestore";
@@ -57,17 +58,49 @@ export default function FimitDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedPointIndex, setSelectedPointIndex] = useState(2);
 
+  // Tooltip state
+  const [activeTooltip, setActiveTooltip] = useState(null);
+
   // Store unsubscribe functions for cleanup
   const [unsubscribeFunctions, setUnsubscribeFunctions] = useState([]);
+
+  // Tooltip data
+  const tooltipData = {
+    totalUsers: {
+      title: "Total Users",
+      description: "Total number of active users registered under your admin account. This includes all users who have signed up with your admin code and have access to the system.",
+      details: [
+        "Includes only users with 'User' type",
+        "Users must be associated with your admin code",
+        "Count updates in real-time as new users register"
+      ]
+    },
+    totalFloorsScanned: {
+      title: "Total Floors Scanned",
+      description: "Total number of floor scanning projects completed by all users under your admin account. Each project represents a complete floor scan session.",
+      details: [
+        "Counts all completed scanning projects",
+        "Includes scans from all users in your organization",
+        "Updates automatically when new scans are completed"
+      ]
+    },
+    scansThisWeek: {
+      title: "Scans This Week",
+      description: "Number of floor scanning projects completed from Monday of the current week until now. This metric helps track weekly activity and productivity.",
+      details: [
+        "Week starts on Monday at 12:00 AM",
+        "Includes scans from all users in your team",
+        "Resets every Monday for the new week"
+      ]
+    }
+  };
 
   // Helper function to clean up listeners
   const cleanupListeners = (listeners) => {
     listeners.forEach(listener => {
       if (typeof listener === 'function') {
-        // Old format - direct function
         listener();
       } else if (listener && typeof listener.unsubscribe === 'function') {
-        // New format - wrapper object
         listener.unsubscribe();
       }
     });
@@ -84,7 +117,6 @@ export default function FimitDashboard() {
           adminCode: data.adminCode || "",
         });
         
-        // After getting admin data, set up real-time listeners
         setupRealtimeListeners(uid, data.adminCode);
       }
     } catch (error) {
@@ -99,7 +131,6 @@ export default function FimitDashboard() {
     try {
       setLoading(true);
 
-      // Real-time listener for users
       const usersQuery = query(
         collection(db, "users"),
         where("adminCode", "==", adminCode),
@@ -133,17 +164,14 @@ export default function FimitDashboard() {
 
         setMonthlyUserData(monthlyUsers);
         
-        // Update stats with new user count
         setStats(prevStats => ({
           ...prevStats,
           totalUsers
         }));
 
-        // Setup projects listener with current user IDs
         if (userIds.length > 0) {
           setupProjectsListener(userIds);
         } else {
-          // If no users, reset project stats
           setStats(prevStats => ({
             ...prevStats,
             totalFloorsScanned: 0,
@@ -153,7 +181,6 @@ export default function FimitDashboard() {
         }
       });
 
-      // ✅ FIXED: Use wrapper object for consistency
       const wrappedUsersUnsubscribe = {
         unsubscribe: unsubscribeUsers,
         listenerType: 'users'
@@ -170,15 +197,13 @@ export default function FimitDashboard() {
 
   // Setup real-time listener for projects
   const setupProjectsListener = (userIds) => {
-    // Clean up existing project listeners
     const existingUnsubscribes = unsubscribeFunctions.filter(listener => {
       if (typeof listener === 'function') {
-        return true; // Keep old format functions that aren't projects
+        return true;
       }
-      return listener.listenerType !== 'projects'; // Filter out project listeners
+      return listener.listenerType !== 'projects';
     });
     
-    // Process userIds in batches (Firestore 'in' query limit is 10)
     const batchSize = 10;
     const projectUnsubscribes = [];
 
@@ -191,11 +216,9 @@ export default function FimitDashboard() {
       );
 
       const unsubscribeProjects = onSnapshot(projectsQuery, (snapshot) => {
-        // Calculate total scans and weekly scans
         let totalScans = 0;
         let weeklyScans = 0;
 
-        // Calculate start of current week (Monday)
         const now = new Date();
         const startOfWeek = new Date(now);
         const dayOfWeek = now.getDay();
@@ -225,7 +248,6 @@ export default function FimitDashboard() {
           }
         });
 
-        // Update stats with scan data
         setStats(prevStats => ({
           ...prevStats,
           totalFloorsScanned: totalScans,
@@ -235,7 +257,6 @@ export default function FimitDashboard() {
         setLoading(false);
       });
 
-      // ✅ FIXED: Use a wrapper object instead of modifying function.name
       const wrappedUnsubscribe = {
         unsubscribe: unsubscribeProjects,
         listenerType: 'projects'
@@ -244,7 +265,6 @@ export default function FimitDashboard() {
       projectUnsubscribes.push(wrappedUnsubscribe);
     }
 
-    // Update unsubscribe functions
     setUnsubscribeFunctions([...existingUnsubscribes, ...projectUnsubscribes]);
   };
 
@@ -256,7 +276,6 @@ export default function FimitDashboard() {
         await fetchAdminData(user.uid);
       } else {
         setCurrentUser(null);
-        // Clean up listeners when user logs out
         cleanupListeners(unsubscribeFunctions);
         setUnsubscribeFunctions([]);
       }
@@ -264,19 +283,16 @@ export default function FimitDashboard() {
 
     return () => {
       unsubscribe();
-      // Clean up all listeners on unmount
       cleanupListeners(unsubscribeFunctions);
     };
   }, []);
 
-  // Clean up listeners when component unmounts
   useEffect(() => {
     return () => {
       cleanupListeners(unsubscribeFunctions);
     };
   }, [unsubscribeFunctions]);
 
-  // Update chart data when selected month changes
   useEffect(() => {
     updateChartData();
   }, [selectedMonth, monthlyUserData]);
@@ -288,7 +304,6 @@ export default function FimitDashboard() {
 
     const newChartData = [];
 
-    // Add 2 months before selected month
     for (let i = 2; i >= 1; i--) {
       let monthIndex = selectedMonthIndex - i;
       let year = currentYear;
@@ -312,7 +327,6 @@ export default function FimitDashboard() {
       });
     }
 
-    // Add selected month in the center
     const selectedMonthYear = `${currentYear}-${(selectedMonthIndex + 1).toString().padStart(2, "0")}`;
     const selectedMonthValue = monthlyUserData[selectedMonthYear] || 0;
 
@@ -325,7 +339,6 @@ export default function FimitDashboard() {
       monthYear: selectedMonthYear,
     });
 
-    // Add 3 months after selected month
     for (let i = 1; i <= 3; i++) {
       let monthIndex = (selectedMonthIndex + i) % 12;
       let year = currentYear;
@@ -348,7 +361,6 @@ export default function FimitDashboard() {
       });
     }
 
-    // Calculate percentages
     const maxValue = Math.max(...newChartData.map((d) => d.value), 1);
     newChartData.forEach((data) => {
       data.percentage = (data.value / maxValue) * 100;
@@ -387,6 +399,51 @@ export default function FimitDashboard() {
     setIsModalOpen(false);
   };
 
+  // Tooltip handlers
+  const handleTooltipClick = (tooltipType) => {
+    setActiveTooltip(activeTooltip === tooltipType ? null : tooltipType);
+  };
+
+  const closeTooltip = () => {
+    setActiveTooltip(null);
+  };
+
+  // Tooltip component
+  const Tooltip = ({ type, data }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 relative">
+        <button
+          onClick={closeTooltip}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <X size={20} />
+        </button>
+        
+        <div className="pr-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">
+            {data.title}
+          </h3>
+          
+          <p className="text-gray-700 mb-4 leading-relaxed">
+            {data.description}
+          </p>
+          
+          <div className="space-y-2">
+            <h4 className="font-medium text-gray-900 text-sm">Key Points:</h4>
+            <ul className="space-y-1">
+              {data.details.map((detail, index) => (
+                <li key={index} className="text-sm text-gray-600 flex items-start">
+                  <span className="text-[#1E3A5F] mr-2">•</span>
+                  <span>{detail}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen h-full bg-black text-white">
       {/* Sidebar */}
@@ -413,6 +470,7 @@ export default function FimitDashboard() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          {/* Total Users Card */}
           <div className="bg-white flex flex-col gap-8 font-poppins p-4 rounded-lg">
             <div className="flex justify-between">
               <div className="flex items-center">
@@ -421,13 +479,19 @@ export default function FimitDashboard() {
                 </div>
                 <span className="text-black">Total Users</span>
               </div>
-              <Info size={20} className="text-black" />
+              <button
+                onClick={() => handleTooltipClick('totalUsers')}
+                className="text-black hover:text-[#1E3A5F] transition-colors"
+              >
+                <Info size={20} />
+              </button>
             </div>
             <div className="text-[32px] text-black font-[500]">
               {loading ? "..." : stats.totalUsers.toLocaleString()}
             </div>
           </div>
 
+          {/* Total Floors Scanned Card */}
           <div className="bg-white flex flex-col gap-8 font-poppins p-4 rounded-lg">
             <div className="flex justify-between">
               <div className="flex items-center">
@@ -436,13 +500,19 @@ export default function FimitDashboard() {
                 </div>
                 <span className="text-black">Total Floors Scanned</span>
               </div>
-              <Info size={20} className="text-black" />
+              <button
+                onClick={() => handleTooltipClick('totalFloorsScanned')}
+                className="text-black hover:text-[#1E3A5F] transition-colors"
+              >
+                <Info size={20} />
+              </button>
             </div>
             <div className="text-[32px] text-black font-[500]">
               {loading ? "..." : stats.totalFloorsScanned.toLocaleString()}
             </div>
           </div>
 
+          {/* Scans This Week Card */}
           <div className="bg-white flex flex-col gap-8 font-poppins p-4 rounded-lg">
             <div className="flex justify-between">
               <div className="flex items-center">
@@ -451,7 +521,12 @@ export default function FimitDashboard() {
                 </div>
                 <span className="text-black">Scans This Week</span>
               </div>
-              <Info size={20} className="text-black" />
+              <button
+                onClick={() => handleTooltipClick('scansThisWeek')}
+                className="text-black hover:text-[#1E3A5F] transition-colors"
+              >
+                <Info size={20} />
+              </button>
             </div>
             <div className="text-[32px] text-black font-[500]">
               {loading ? "..." : stats.scansThisWeek.toLocaleString()}
@@ -491,9 +566,9 @@ export default function FimitDashboard() {
                   </div>
                 )}
               </div>
-              <button className="p-2 hover:bg-gray-50 rounded-lg transition-colors">
+              {/* <button className="p-2 hover:bg-gray-50 rounded-lg transition-colors">
                 <MoreHorizontal size={20} className="text-gray-600" />
-              </button>
+              </button> */}
             </div>
           </div>
 
@@ -571,6 +646,14 @@ export default function FimitDashboard() {
             )}
           </div>
         </div>
+
+        {/* Tooltips */}
+        {activeTooltip && (
+          <Tooltip
+            type={activeTooltip}
+            data={tooltipData[activeTooltip]}
+          />
+        )}
 
         <AddCategories
           isOpen={isModalOpen}

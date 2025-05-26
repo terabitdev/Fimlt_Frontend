@@ -1,7 +1,8 @@
 
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Edit2, ChevronDown } from 'lucide-react';
+import { Edit2, ChevronDown, Copy, Share2, Check } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { 
   doc, 
@@ -23,6 +24,7 @@ function TopBar({ onSearch, searchType = 'users' }) {
     uid: ''
   });
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showAdminCodeDropdown, setShowAdminCodeDropdown] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editData, setEditData] = useState({
     name: '',
@@ -31,7 +33,9 @@ function TopBar({ onSearch, searchType = 'users' }) {
   const [isEditLoading, setIsEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
+  const [copySuccess, setCopySuccess] = useState(false);
   const profileRef = useRef(null);
+  const adminCodeRef = useRef(null);
   const modalRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -49,11 +53,14 @@ function TopBar({ onSearch, searchType = 'users' }) {
     };
   };
 
-  // Handle clicks outside profile dropdown to close it
+  // Handle clicks outside dropdowns to close them
   useEffect(() => {
     function handleClickOutside(event) {
       if (profileRef.current && !profileRef.current.contains(event.target) && !modalRef.current?.contains(event.target)) {
         setShowProfileDropdown(false);
+      }
+      if (adminCodeRef.current && !adminCodeRef.current.contains(event.target)) {
+        setShowAdminCodeDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -238,6 +245,81 @@ function TopBar({ onSearch, searchType = 'users' }) {
   // Toggle the profile dropdown
   const toggleProfileDropdown = () => {
     setShowProfileDropdown(!showProfileDropdown);
+    setShowAdminCodeDropdown(false); // Close admin code dropdown when opening profile
+  };
+
+  // Toggle the admin code dropdown
+  const toggleAdminCodeDropdown = (e) => {
+    e.stopPropagation(); // Prevent profile dropdown from opening
+    setShowAdminCodeDropdown(!showAdminCodeDropdown);
+    setShowProfileDropdown(false); // Close profile dropdown when opening admin code
+  };
+
+  // Copy admin code to clipboard
+  const copyAdminCode = async () => {
+    try {
+      await navigator.clipboard.writeText(userData.adminCode);
+      setCopySuccess(true);
+      setTimeout(() => {
+        setCopySuccess(false);
+        setShowAdminCodeDropdown(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy admin code:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = userData.adminCode;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopySuccess(true);
+        setTimeout(() => {
+          setCopySuccess(false);
+          setShowAdminCodeDropdown(false);
+        }, 2000);
+      } catch (fallbackError) {
+        console.error('Fallback copy failed:', fallbackError);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
+  // Share admin code
+  const shareAdminCode = async () => {
+    const shareData = {
+      title: 'Admin Code',
+      text: `Admin Code: ${userData.adminCode}`
+    };
+
+    try {
+      // Check if Web Share API is supported
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback: copy to clipboard with share message
+        const shareText = `Admin Code: ${userData.adminCode}`;
+        await navigator.clipboard.writeText(shareText);
+        alert('Admin code copied to clipboard! You can now paste and share it.');
+      }
+      setShowAdminCodeDropdown(false);
+    } catch (error) {
+      console.error('Error sharing admin code:', error);
+      // Another fallback
+      const shareText = `Admin Code: ${userData.adminCode}`;
+      const textArea = document.createElement('textarea');
+      textArea.value = shareText;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        alert('Admin code copied to clipboard! You can now paste and share it.');
+      } catch (fallbackError) {
+        console.error('Fallback copy failed:', fallbackError);
+      }
+      document.body.removeChild(textArea);
+      setShowAdminCodeDropdown(false);
+    }
   };
 
   // Open edit modal
@@ -363,8 +445,46 @@ function TopBar({ onSearch, searchType = 'users' }) {
                 <div className="text-white font-[400] text-[12px]">
                   {userData.email || 'Loading...'}
                 </div>
-                <div className="text-white font-[600] text-end md:text-left text-[12px] mt-1">
-                  Admin Code: {userData.adminCode || 'Loading...'}
+                {/* Admin Code with dropdown functionality */}
+                <div className="relative" ref={adminCodeRef}>
+                  <div 
+                    className="text-white font-[600] text-end md:text-left text-[12px] mt-1 cursor-pointer hover:text-blue-300 transition-colors duration-200 flex items-center"
+                    onClick={toggleAdminCodeDropdown}
+                  >
+                    Admin Code: {userData.adminCode || 'Loading...'}
+                    <ChevronDown size={12} className="ml-1" />
+                  </div>
+                  
+                  {/* Admin Code Dropdown */}
+                  {showAdminCodeDropdown && userData.adminCode && userData.adminCode !== 'Loading...' && (
+                    <div className="absolute left-0 md:right-0 md:left-auto mt-2 w-48 bg-[#111111] rounded-md shadow-lg z-50 overflow-hidden border border-gray-600">
+                      <div className="p-2">
+                        <button 
+                          onClick={copyAdminCode}
+                          className="w-full text-left px-3 py-2 rounded-md hover:bg-[#312f2f] flex items-center text-white transition-colors duration-200"
+                        >
+                          {copySuccess ? (
+                            <>
+                              <Check size={16} className="mr-2 text-green-400" />
+                              <span className="text-green-400">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={16} className="mr-2" />
+                              <span>Copy to Clipboard</span>
+                            </>
+                          )}
+                        </button>
+                        <button 
+                          onClick={shareAdminCode}
+                          className="w-full text-left px-3 py-2 rounded-md hover:bg-[#312f2f] flex items-center text-white transition-colors duration-200"
+                        >
+                          <Share2 size={16} className="mr-2" />
+                          <span>Share Code</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <ChevronDown size={16} className="text-white ml-2" />

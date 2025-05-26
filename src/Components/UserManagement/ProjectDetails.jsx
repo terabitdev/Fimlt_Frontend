@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect, useRef } from 'react';
 import SideBar from '../../Components/SideBar';
 import TopBar from '../../Components/TopBar';
@@ -23,13 +22,12 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
   const navigate = useNavigate();
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   
-  // Process room details from roomData array - grouped by category
+  // Process room details from roomData array - handle name/dimensions structure
   const processRoomDetails = () => {
     const groupedDetails = {
       category: [],
       names: [],
-      dimensions: [],
-      other: []
+      dimensions: []
     };
     
     // Add main category if available
@@ -43,15 +41,20 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
       
       projectData.roomData.forEach((item, index) => {
         if (item && typeof item === 'object') {
+          // Handle the specific structure: {name: "Category", dimensions: "Room"}
+          if (item.name !== undefined && item.dimensions !== undefined) {
+            // For index 0, change "Category" to "Subcategory"
+            const displayName = index === 0 && item.name === "Category" ? "Subcategory" : item.name;
+            groupedDetails.names.push(displayName);
+            groupedDetails.dimensions.push(item.dimensions);
+          }
           // If item is an object with name/value pairs
-          if (item.name && item.value !== undefined) {
+          else if (item.name && item.value !== undefined) {
             const key = item.name.toLowerCase();
             if (key.includes('name') || key.includes('room')) {
               groupedDetails.names.push(item.value);
             } else if (key.includes('dimension') || key.includes('size') || key.includes('area') || key.includes('length') || key.includes('width') || key.includes('height')) {
               groupedDetails.dimensions.push(item.value);
-            } else {
-              groupedDetails.other.push({ name: item.name, value: item.value });
             }
           }
           // If item is an object with other properties
@@ -62,11 +65,6 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
                 groupedDetails.names.push(value);
               } else if (lowerKey.includes('dimension') || lowerKey.includes('size') || lowerKey.includes('area') || lowerKey.includes('length') || lowerKey.includes('width') || lowerKey.includes('height')) {
                 groupedDetails.dimensions.push(value);
-              } else {
-                const formattedKey = key
-                  .replace(/([A-Z])/g, ' $1')
-                  .replace(/^./, str => str.toUpperCase());
-                groupedDetails.other.push({ name: formattedKey, value: value });
               }
             });
           }
@@ -79,8 +77,6 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
             groupedDetails.names.push(item);
           } else if (itemString.includes('dimension') || itemString.includes('size') || itemString.includes('area') || /\d+\s*(x|×|by)\s*\d+/.test(itemString)) {
             groupedDetails.dimensions.push(item);
-          } else {
-            groupedDetails.other.push({ name: `Property ${index + 1}`, value: item });
           }
         }
       });
@@ -155,7 +151,7 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
           <div className="w-full h-full font-SFProDisplay">
             <table className="w-full">
               <tbody>
-                {/* Category and Names Row */}
+                {/* Category Row */}
                 {(roomDetails.category.length > 0 || roomDetails.names.length > 0) && (
                   <>
                     <tr>
@@ -204,29 +200,12 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
                     </td>
                   </tr>
                 ))}
-
-                {/* Other Properties Section */}
-                {roomDetails.other.length > 0 && (
-                  <>
-                    <tr>
-                      <td colSpan="2" className="text-left py-1 px-2 font-[600] text-[#090D00] text-lg border-b border-gray-200 pt-4">
-                        Other Properties
-                      </td>
-                    </tr>
-                    {roomDetails.other.map((detail, index) => (
-                      <tr key={`other-${index}`}>
-                        <td className="text-left py-1 px-2 font-[400] text-[#090D00]">{detail.name}</td>
-                        <td className="text-right py-1 px-2 font-medium text-[#090D00]">{detail.value}</td>
-                      </tr>
-                    ))}
-                  </>
-                )}
               </tbody>
             </table>
 
             {/* No Data Message */}
             {roomDetails.category.length === 0 && roomDetails.names.length === 0 && 
-             roomDetails.dimensions.length === 0 && roomDetails.other.length === 0 && (
+             roomDetails.dimensions.length === 0 && (
               <div className="flex items-center justify-center h-full">
                 <p className="text-center text-gray-500">No room details available</p>
               </div>
@@ -441,10 +420,7 @@ function ProjectDetails() {
     fetchProjectData();
   }, [projectId, modelFormat]);
 
-  // Handle back navigation
-  const handleBackClick = () => {
-    navigate('/user-details');
-  };
+
 
   return (
     <div className="flex min-h-screen h-full bg-black text-white">
@@ -453,12 +429,6 @@ function ProjectDetails() {
         <TopBar />
         <div className="flex justify-between font-DMSansRegular items-center mb-6">
           <h1 className="text-2xl md:text-3xl font-[500]">Project Details</h1>
-          <button
-            onClick={handleBackClick}
-            className="bg-[#1E3A5F] text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Back to Projects
-          </button>
         </div>  
         
         {loading ? (
