@@ -156,9 +156,9 @@ function RoomMeasurementInterface() {
             Date: <span className="font-[400]"> {userData.date}</span>
           </p>
         </div>
-        <div className="flex flex-col md:flex-row gap-2 font-Urbanist">
+        {/* <div className="flex flex-col md:flex-row gap-2 font-Urbanist">
           <FilterByCategories />
-        </div>
+        </div> */}
       </div>
 
       {/* Facility Card - Keep Original Size */}

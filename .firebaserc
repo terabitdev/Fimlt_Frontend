@@ -1,7 +1,6 @@
 {
   "projects": {
-    "production": "daily-helper-74a49",
-    "default": "daily-helper-74a49"
+    "default": "fimit-7652c"
   },
   "targets": {},
   "etags": {}
