@@ -25,27 +25,27 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
   // Process room details from roomData array - handle name/dimensions structure
   const processRoomDetails = () => {
     const groupedDetails = {
-      category: [],
+      category: projectData?.category || '',
+      subCategory: projectData?.subCategory || '',
       names: [],
       dimensions: []
     };
-    
-    // Add main category if available
-    if (projectData?.category) {
-      groupedDetails.category.push(projectData.category);
-    }
     
     // Process roomData array
     if (projectData?.roomData && Array.isArray(projectData.roomData)) {
       console.log("Room data for display:", projectData.roomData);
       
       projectData.roomData.forEach((item, index) => {
+        // Skip index 0
+        if (index === 0) {
+          return;
+        }
+        
         if (item && typeof item === 'object') {
           // Handle the specific structure: {name: "Category", dimensions: "Room"}
           if (item.name !== undefined && item.dimensions !== undefined) {
-            // For index 0, change "Category" to "Subcategory"
-            const displayName = index === 0 && item.name === "Category" ? "Subcategory" : item.name;
-            groupedDetails.names.push(displayName);
+            // Add all items to arrays (excluding index 0)
+            groupedDetails.names.push(item.name);
             groupedDetails.dimensions.push(item.dimensions);
           }
           // If item is an object with name/value pairs
@@ -152,22 +152,30 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
             <table className="w-full">
               <tbody>
                 {/* Category Row */}
-                {(roomDetails.category.length > 0 || roomDetails.names.length > 0) && (
-                  <>
-                    <tr>
-                      <td className="text-left py-1 px-2 font-[600] text-[#090D00] text-lg border-b border-gray-200">
-                        Category
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="text-left py-1 px-2 font-[400] text-[#090D00]">
-                        {roomDetails.category.length > 0 ? roomDetails.category[0] : ''}
-                      </td>
-                    </tr>
-                  </>
+                {roomDetails.category && (
+                  <tr>
+                    <td className="text-left py-1 px-2 font-[600] text-[#090D00] text-lg border-b border-gray-200">
+                      Category
+                    </td>
+                    <td className="text-right py-1 px-2 font-[400] text-[#090D00] border-b border-gray-200">
+                      {roomDetails.category}
+                    </td>
+                  </tr>
                 )}
 
-                {/* Name and Dimensions Row */}
+                {/* Sub Category Row */}
+                {roomDetails.subCategory && (
+                  <tr>
+                    <td className="text-left py-1 px-2 font-[600] text-[#090D00] text-lg border-b border-gray-200">
+                      Sub Category
+                    </td>
+                    <td className="text-right py-1 px-2 font-[400] text-[#090D00] border-b border-gray-200">
+                      {roomDetails.subCategory}
+                    </td>
+                  </tr>
+                )}
+
+                {/* Name and Dimensions Header Row */}
                 {(roomDetails.names.length > 0 || roomDetails.dimensions.length > 0) && (
                   <>
                     <tr>
@@ -178,34 +186,28 @@ function RoomMeasurementInterface({ projectData, onUpdatePreview, onDeleteProjec
                         Dimension
                       </td>
                     </tr>
-                    <tr>
-                      <td className="text-left py-1 px-2 font-[400] text-[#090D00]">
-                        {roomDetails.names.length > 0 ? roomDetails.names[0] : ''}
-                      </td>
-                      <td className="text-right py-1 px-2 font-medium text-[#090D00]">
-                        {roomDetails.dimensions.length > 0 ? roomDetails.dimensions[0] : ''}
-                      </td>
-                    </tr>
+                    
+                    {/* Map through all name-dimension pairs */}
+                    {Math.max(roomDetails.names.length, roomDetails.dimensions.length) > 0 && 
+                      Array.from({ length: Math.max(roomDetails.names.length, roomDetails.dimensions.length) }, (_, index) => (
+                        <tr key={`name-dimension-${index}`}>
+                          <td className="text-left py-1 px-2 font-[400] text-[#090D00]">
+                            {roomDetails.names[index] || `Room ${index + 1}`}
+                          </td>
+                          <td className="text-right py-1 px-2 font-medium text-[#090D00]">
+                            {roomDetails.dimensions[index] || ''}
+                          </td>
+                        </tr>
+                      ))
+                    }
                   </>
                 )}
-
-                {/* Additional Dimensions with different names or room identifiers */}
-                {roomDetails.dimensions.slice(1).map((dimension, index) => (
-                  <tr key={`dimension-${index}`}>
-                    <td className="text-left py-1 px-2 font-[400] text-[#090D00]">
-                      {roomDetails.names[index + 1] || `Room ${index + 2}`}
-                    </td>
-                    <td className="text-right py-1 px-2 font-medium text-[#090D00]">
-                      {dimension}
-                    </td>
-                  </tr>
-                ))}
               </tbody>
             </table>
 
             {/* No Data Message */}
-            {roomDetails.category.length === 0 && roomDetails.names.length === 0 && 
-             roomDetails.dimensions.length === 0 && (
+            {!roomDetails.category && !roomDetails.subCategory && 
+             roomDetails.names.length === 0 && roomDetails.dimensions.length === 0 && (
               <div className="flex items-center justify-center h-full">
                 <p className="text-center text-gray-500">No room details available</p>
               </div>
@@ -403,6 +405,7 @@ function ProjectDetails() {
           name: projectData.name || 'Unnamed Project',
           description: projectData.description || '',
           category: projectData.category || '',
+          subCategory: projectData.subCategory || '',
           roomData: projectData.roomData || [],
           usdFileUrl: modelUrl,
           modelFormat: modelFormat,
