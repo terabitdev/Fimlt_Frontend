@@ -566,9 +566,9 @@ export default function FimitDashboard() {
                   </div>
                 )}
               </div>
-              <button className="p-2 hover:bg-gray-50 rounded-lg transition-colors">
+              {/* <button className="p-2 hover:bg-gray-50 rounded-lg transition-colors">
                 <MoreHorizontal size={20} className="text-gray-600" />
-              </button>
+              </button> */}
             </div>
           </div>
 
