@@ -1,16 +1,8 @@
 [
   {
-    "origin": ["*"],
-    "method": ["GET", "HEAD", "OPTIONS"],
-    "responseHeader": [
-      "Content-Type", 
-      "Access-Control-Allow-Origin",
-      "Cross-Origin-Embedder-Policy",
-      "Cross-Origin-Opener-Policy",
-      "Cross-Origin-Resource-Policy",
-      "Content-Length",
-      "Content-Range"
-    ],
-    "maxAgeSeconds": 3600
+    "origin": ["https://fimit-7652c.web.app"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Cross-Origin-Resource-Policy"]
   }
 ]
