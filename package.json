@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && xcopy public\\wasm dist\\wasm /E /I /Y",
     "lint": "eslint .",
     "preview": "vite preview"
   },
