@@ -8,7 +8,7 @@
     ],
     "headers": [
       {
-        "source": "/wasm/**",
+        "source": "**",
         "headers": [
           {
             "key": "Cross-Origin-Embedder-Policy",
